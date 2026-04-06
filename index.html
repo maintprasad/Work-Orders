@@ -720,10 +720,8 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="sb-section" id="filter-section" style="display:none">
     <div class="sb-label">Filter Status</div>
     <div class="sb-item" onclick="filterWO('Open')"><span class="sb-icon" style="color:var(--blue)">🔵</span>Open<span class="sb-count" id="cnt-open">0</span></div>
-    <div class="sb-item" onclick="filterWO('Assigned')"><span class="sb-icon" style="color:var(--purple)">🟣</span>Assigned<span class="sb-count" id="cnt-assigned">0</span></div>
     <div class="sb-item" onclick="filterWO('In Progress')"><span class="sb-icon" style="color:var(--accent)">🟡</span>In Progress<span class="sb-count" id="cnt-inprogress">0</span></div>
     <div class="sb-item" onclick="filterWO('Done')"><span class="sb-icon" style="color:var(--green)">🟢</span>Done<span class="sb-count" id="cnt-done">0</span></div>
-    <div class="sb-item" onclick="filterByPriority('Critical')"><span class="sb-icon" style="color:var(--red)">⚡</span>Critical<span class="sb-count alert" id="cnt-critical">0</span></div>
   </div>
 
   <!-- MAINTENANCE TOOLS — Maintenance role -->
@@ -759,11 +757,6 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="stat-val" id="s-inprogress"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
       <div class="stat-sub">sedang dikerjakan</div>
     </div>
-    <div class="stat-card c-red" onclick="filterByPriority('Critical')">
-      <div class="stat-lbl">Critical</div>
-      <div class="stat-val" id="s-critical"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
-      <div class="stat-sub">prioritas kritis</div>
-    </div>
     <div class="stat-card c-green" onclick="filterWO('Done')">
       <div class="stat-lbl">Done (Bulan Ini)</div>
       <div class="stat-val" id="s-done-month"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
@@ -773,11 +766,6 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="stat-lbl">Open</div>
       <div class="stat-val" id="s-open"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
       <div class="stat-sub">menunggu ditugaskan</div>
-    </div>
-    <div class="stat-card c-purple" onclick="filterWO('Draft')">
-      <div class="stat-lbl">Draft</div>
-      <div class="stat-val" id="s-draft"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
-      <div class="stat-sub">belum dirilis</div>
     </div>
   </div>
 
@@ -810,7 +798,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
     <select class="fsel" id="filterStatus" onchange="renderWOList()">
       <option value="">Semua Status</option>
       <option value="active">Aktif</option>
-      <option>Draft</option><option>Open</option><option>Assigned</option>
+      <option>Open</option>
       <option>In Progress</option><option>Done</option><option>Cancelled</option>
     </select>
     <select class="fsel" id="filterType" onchange="renderWOList()">
@@ -820,7 +808,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
     </select>
     <select class="fsel" id="filterPriority" onchange="renderWOList()">
       <option value="">Semua Prioritas</option>
-      <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+      <option>Low</option><option>Medium</option><option>High</option>
     </select>
   </div>
 
@@ -1195,7 +1183,7 @@ _Terima kasih. WO telah ditutup._</div>
         <div class="fg">
           <label class="flabel">Prioritas *</label>
           <select class="fsel2" id="wo-priority">
-            <option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option>
+            <option>Low</option><option selected>Medium</option><option>High</option>
           </select>
         </div>
 
@@ -1556,7 +1544,7 @@ _Terima kasih. WO telah ditutup._</div>
           <label class="flabel">Filter Status</label>
           <select class="fsel2" id="print-filter-status">
             <option value="">Semua Status</option>
-            <option>Draft</option><option>Open</option><option>Assigned</option>
+            <option>Open</option>
             <option>In Progress</option><option>Done</option><option>Cancelled</option>
           </select>
         </div>
@@ -1564,7 +1552,7 @@ _Terima kasih. WO telah ditutup._</div>
           <label class="flabel">Filter Prioritas</label>
           <select class="fsel2" id="print-filter-priority">
             <option value="">Semua Prioritas</option>
-            <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+            <option>High</option><option>Medium</option><option>Low</option>
           </select>
         </div>
       </div>
@@ -1916,10 +1904,8 @@ function refreshCounts() {
   const cnt = s => all.filter(w => w.status === s).length;
   setText('cnt-all',        all.length);
   setText('cnt-open',       cnt('Open'));
-  setText('cnt-assigned',   cnt('Assigned'));
   setText('cnt-inprogress', cnt('In Progress'));
   setText('cnt-done',       cnt('Done'));
-  setText('cnt-critical',   all.filter(w => w.priority === 'Critical' && w.status !== 'Done' && w.status !== 'Cancelled').length);
   setText('cnt-tech',       WO.technicians.filter(t => t.status === 'Active').length);
 }
 
@@ -1940,11 +1926,9 @@ function renderDashboard() {
 
   setText('s-total',      all.length);
   setText('s-inprogress', all.filter(w => w.status === 'In Progress').length);
-  setText('s-critical',   all.filter(w => w.priority === 'Critical' && w.status !== 'Done' && w.status !== 'Cancelled').length);
   setText('s-done-month', doneThisMonth);
   setText('s-done-rate',  rate + '% completion rate');
   setText('s-open',       all.filter(w => w.status === 'Open').length);
-  setText('s-draft',      all.filter(w => w.status === 'Draft').length);
 
   const recent = [...all].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
   const el = document.getElementById('dash-recent-wo');
@@ -1986,7 +1970,7 @@ function renderWOList() {
                         || (w.requestorDept||'').toLowerCase().includes(q)
                         || (getEquipName(w.equipId)||'').toLowerCase().includes(q)
                         || (getTechName(w.techId)||'').toLowerCase().includes(q);
-      const activeStatuses = ['Draft','Open','Assigned','In Progress'];
+      const activeStatuses = ['Open','In Progress'];
       const matchSt   = !fStatus || (fStatus === 'active' ? activeStatuses.includes(w.status) : w.status === fStatus);
       const matchTy   = !fType   || w.type     === fType;
       const matchPr   = !fPri    || w.priority === fPri;
@@ -2126,7 +2110,7 @@ function woTableRow(w, showActions = false) {
   const isDueToday = due && due.getTime() === today.getTime() && w.status !== 'Done' && w.status !== 'Cancelled';
   const rowClass = isOverdue ? 'style="background:rgba(192,57,43,.04)"' : isDueToday ? 'style="background:rgba(251,140,58,.04)"' : '';
   // Quick status options
-  const nextStatuses = {Draft:['Open'],Open:['Assigned','Cancelled'],Assigned:['In Progress','Cancelled'],'In Progress':['Done','Cancelled'],Done:[],Cancelled:[]};
+  const nextStatuses = {Open:['In Progress','Cancelled'],'In Progress':['Done','Cancelled'],Done:[],Cancelled:[]};
   const nextOpts = (nextStatuses[w.status]||[]).map(s => `<option value="${s}">${s}</option>`).join('');
   return `<tr onclick="showDetail('${w.id}')" ${rowClass}>
     <td onclick="event.stopPropagation()">
@@ -2224,7 +2208,7 @@ function showDetail(woId) {
   if (!wo) return;
   navigateTo('detail');
 
-  const STATUS_FLOW = ['Draft', 'Open', 'Assigned', 'In Progress', 'Done'];
+  const STATUS_FLOW = ['Open', 'In Progress', 'Done'];
   const curIdx = STATUS_FLOW.indexOf(wo.status);
   const pColor = {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'};
 
@@ -2248,9 +2232,7 @@ function showDetail(woId) {
     const s = wo.status;
     let primary = '';
     let danger  = '';
-    if (s === 'Draft')       primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Open',null)">▶ Rilis ke Open</button>`;
-    if (s === 'Open')        primary = `<button class="btn-action-primary" onclick="openAssignModal('${woId}')">👷 Assign Teknisi</button>`;
-    if (s === 'Assigned')    primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','In Progress','note')">▶ Mulai Kerjakan</button>`;
+    if (s === 'Open')        primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','In Progress','note')">▶ Mulai Kerjakan</button>`;
     if (s === 'In Progress') primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Done','done')">✅ Tandai Selesai</button>`;
     if (s !== 'Done' && s !== 'Cancelled')
       danger = `<button class="btn-action-danger" onclick="changeStatus('${woId}','Cancelled','note')">✕ Batalkan WO</button>`;
@@ -2547,12 +2529,12 @@ function renderReports() {
     }
   );
   document.getElementById('rep-by-priority').innerHTML = renderBar(
-    ['Critical','High','Medium','Low'].map(p => [p, all.filter(w=>w.priority===p).length]),
-    {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'}
+    ['High','Medium','Low'].map(p => [p, all.filter(w=>w.priority===p).length]),
+    {High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'}
   );
   document.getElementById('rep-by-status').innerHTML = renderBar(
-    ['Draft','Open','Assigned','In Progress','Done','Cancelled'].map(s => [s, all.filter(w=>w.status===s).length]),
-    {Draft:'var(--text3)',Open:'var(--blue)',Assigned:'var(--purple)','In Progress':'var(--accent)',Done:'var(--green)',Cancelled:'var(--red)'}
+    ['Open','In Progress','Done','Cancelled'].map(s => [s, all.filter(w=>w.status===s).length]),
+    {Open:'var(--blue)','In Progress':'var(--accent)',Done:'var(--green)',Cancelled:'var(--red)'}
   );
 }
 
@@ -2794,7 +2776,7 @@ function confirmAction() {
     if (!techId) { toast('Pilih teknisi dulu', 'error'); return; }
     const oldTech = wo.techId;
     wo.techId = techId;
-    if (wo.status === 'Open' || wo.status === 'Draft') wo.status = 'Assigned';
+    if (wo.status === 'Open') wo.status = 'In Progress';
     addAudit(wo, 'status', `${oldTech ? 'Re-assign' : 'Assigned'} → ${getTechName(techId)}`);
     // Hide assign row
     const ar = document.getElementById('assign-tech-row');
@@ -2910,7 +2892,7 @@ function saveWO() {
     wo = {
       id: newId, title,
       type:            document.getElementById('wo-type').value,
-      status:          'Draft',
+      status:          'Open',
       priority:        document.getElementById('wo-priority').value,
       equipId, techId: '', unitId, areaId,
       requestorName,
@@ -3683,7 +3665,7 @@ function normalizeWOFromSheets(w) {
     id:            t(w.id),
     title:         t(w.title),
     type:          t(w.type),
-    status:        t(w.status)   || 'Draft',
+    status:        t(w.status)   || 'Open',
     priority:      t(w.priority) || 'Medium',
     equipId:       t(w.equipId),
     techId:        t(w.techId),
@@ -4653,7 +4635,6 @@ function executePrint() {
   const done     = filtered.filter(w => w.status === 'Done').length;
   const inProg   = filtered.filter(w => w.status === 'In Progress').length;
   const open     = filtered.filter(w => w.status === 'Open').length;
-  const critical = filtered.filter(w => w.priority === 'Critical' && w.status !== 'Done' && w.status !== 'Cancelled').length;
   const rate     = total ? Math.round(done / total * 100) : 0;
   const avgHours = (() => {
     const doneWO = filtered.filter(w => w.status === 'Done' && parseFloat(w.actualHours) > 0);
@@ -4673,7 +4654,7 @@ function executePrint() {
       <div class="print-kpi-card"><div class="print-kpi-val">${total}</div><div class="print-kpi-lbl">Total WO</div></div>
       <div class="print-kpi-card"><div class="print-kpi-val">${done}</div><div class="print-kpi-lbl">Selesai</div></div>
       <div class="print-kpi-card"><div class="print-kpi-val">${rate}%</div><div class="print-kpi-lbl">Completion Rate</div></div>
-      <div class="print-kpi-card"><div class="print-kpi-val">${critical}</div><div class="print-kpi-lbl">Critical Aktif</div></div>
+      <div class="print-kpi-card"><div class="print-kpi-val">${inProg}</div><div class="print-kpi-lbl">In Progress</div></div>
       <div class="print-kpi-card"><div class="print-kpi-val">${avgHours}</div><div class="print-kpi-lbl">Avg Durasi</div></div>
     </div>` : '';
 
@@ -4692,14 +4673,11 @@ function executePrint() {
         <div class="print-group-title">Distribusi Status</div>
         ${mkBar('Done',     filtered.filter(w=>w.status==='Done').length,     total, '#4a9e3f')}
         ${mkBar('In Progress', filtered.filter(w=>w.status==='In Progress').length, total, '#f0b429')}
-        ${mkBar('Assigned', filtered.filter(w=>w.status==='Assigned').length, total, '#b88ff7')}
         ${mkBar('Open',     filtered.filter(w=>w.status==='Open').length,     total, '#2b6cb8')}
-        ${mkBar('Draft',    filtered.filter(w=>w.status==='Draft').length,    total, '#8891a8')}
         ${mkBar('Cancelled',filtered.filter(w=>w.status==='Cancelled').length,total, '#c0392b')}
       </div>
       <div class="print-group-box">
         <div class="print-group-title">Distribusi Prioritas</div>
-        ${mkBar('Critical', filtered.filter(w=>w.priority==='Critical').length, total, '#c0392b')}
         ${mkBar('High',     filtered.filter(w=>w.priority==='High').length,     total, '#fb8c3a')}
         ${mkBar('Medium',   filtered.filter(w=>w.priority==='Medium').length,   total, '#4a9e3f')}
         ${mkBar('Low',      filtered.filter(w=>w.priority==='Low').length,      total, '#8891a8')}
