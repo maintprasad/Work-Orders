@@ -1988,7 +1988,6 @@ function renderWOList() {
   const container = document.getElementById('wo-list-container');
 
   if (!list.length) {
-    const hasFilter = fStatus || fType || fPri || q;
     container.innerHTML = hasFilter
       ? emptyState('🔍', 'Tidak ada WO yang cocok dengan filter')
       : `<div class="empty">
@@ -2002,15 +2001,17 @@ function renderWOList() {
   }
 
   if (ST.viewMode === 'card') {
+    // FIX: tidak ada onclick di dalam woCard(), semua ditangani attachCardEvents()
     container.innerHTML = `<div class="wo-board">${list.map(w => woCard(w)).join('')}</div>`;
+    attachCardEvents();
   } else {
+    // FIX: tidak ada onclick di dalam woTableRow(), semua ditangani attachTableEvents()
     container.innerHTML = `<div class="tbl-wrap"><table class="data-table"><thead><tr>
       <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Equipment</th><th>Unit</th><th>Teknisi</th><th>Status</th><th>Due</th><th></th>
     </tr></thead><tbody>${list.map(w => woTableRow(w, true)).join('')}</tbody></table></div>`;
-    attachTableEvents(); // ← BARIS BARU INI SAJA
+    attachTableEvents();
   }
 }
-
 
 // ── Populate dropdown filter Unit, Area, Teknisi dari data EQUIP_DB + WO ──
 function populateFilterDropdowns() {
@@ -2174,6 +2175,52 @@ function attachTableEvents() {
       return;
     }
 
+     // Event delegation untuk card view — mirip attachTableEvents tapi untuk .wo-card-clickable
+function attachCardEvents() {
+  const container = document.getElementById('wo-list-container');
+  if (!container) return;
+
+  // Clone trick — hapus listener lama
+  const fresh = container.cloneNode(true);
+  container.parentNode.replaceChild(fresh, container);
+
+  const el = document.getElementById('wo-list-container');
+
+  el.addEventListener('click', function(e) {
+    // Tombol copy ⎘
+    const copyBtn = e.target.closest('.copy-btn[data-copy]');
+    if (copyBtn) {
+      e.stopPropagation();
+      const id = copyBtn.dataset.copy;
+      navigator.clipboard.writeText(id).catch(() => {});
+      copyBtn.textContent = '✓';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = '⎘'; copyBtn.classList.remove('copied'); }, 1500);
+      return;
+    }
+
+    // Tombol edit ✏ di card
+    const editBtn = e.target.closest('.card-edit-btn[data-woid-b64]');
+    if (editBtn) {
+      e.stopPropagation();
+      openModal('wo', decodeURIComponent(escape(atob(editBtn.dataset.woidB64))));
+      return;
+    }
+
+    // Elemen yang harus stop propagation (tidak buka detail)
+    if (e.target.closest('.td-stopclick')) {
+      e.stopPropagation();
+      return;
+    }
+
+    // Klik card → buka detail
+    const card = e.target.closest('.wo-card-clickable[data-woid-b64]');
+    if (card) {
+      showDetail(decodeURIComponent(escape(atob(card.dataset.woidB64))));
+    }
+  });
+}
+
     // Tombol detail 👁
     const detailBtn = e.target.closest('.td-btn-detail[data-woid-b64]');
     if (detailBtn) {
@@ -2224,6 +2271,9 @@ function attachTableEvents() {
 
    
 function woCard(w) {
+  // FIX: encode WO ID ke base64 — aman dari karakter / ' " di onclick
+  const woIdB64 = btoa(unescape(encodeURIComponent(w.id)));
+
   const pColor = {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'};
   const done  = w.checklist?.filter(c => c.done).length || 0;
   const total = w.checklist?.length || 0;
@@ -2236,11 +2286,15 @@ function woCard(w) {
   const isOverdue  = due && due < today && w.status !== 'Done' && w.status !== 'Cancelled';
   const isDueToday = due && due.getTime() === today.getTime() && w.status !== 'Done' && w.status !== 'Cancelled';
   const cardClass  = isOverdue ? ' overdue' : isDueToday ? ' due-today-card' : '';
-  return `<div class="wo-card${cardClass}" onclick="showDetail('${w.id}')">
+
+  // FIX: TIDAK ada onclick="showDetail(...)" atau onclick="openModal(...)" di sini
+  // Semua klik ditangani oleh attachCardEvents() via event delegation
+  // WO ID disimpan di data-woid-b64, bukan di string onclick
+  return `<div class="wo-card${cardClass} wo-card-clickable" data-woid-b64="${woIdB64}">
     <div class="wo-card-accent" style="background:${pColor[w.priority]||'var(--text3)'}"></div>
     <div class="wo-card-head">
       <span class="wo-card-id">${esc(w.id)}
-        <button class="copy-btn" onclick="copyWOId('${w.id}',this)" title="Salin WO ID">⎘</button>
+        <button class="copy-btn td-stopclick" data-copy="${esc(w.id)}" title="Salin WO ID">⎘</button>
       </span>
       ${badgeStatus(w.status)}
     </div>
@@ -2251,7 +2305,7 @@ function woCard(w) {
       ${w.equipId ? `<div class="wo-meta-row"><span class="wo-meta-ico">⚙</span>${esc(getEquipName(w.equipId)||w.equipId)}</div>` : ''}
       ${w.techId  ? `<div class="wo-meta-row"><span class="wo-meta-ico">👷</span>${esc(getTechName(w.techId)||w.techId)}</div>`
                   : '<div class="wo-meta-row" style="color:var(--text3)"><span class="wo-meta-ico">👷</span>Belum ditugaskan</div>'}
-      ${w.dueDate ? `<div class="wo-meta-row"><span class="wo-meta-ico">📅</span>${dueLabelHtml(w.dueDate, w.status)}</div>` : (isOverdue||isDueToday?'':'')}
+      ${w.dueDate ? `<div class="wo-meta-row"><span class="wo-meta-ico">📅</span>${dueLabelHtml(w.dueDate, w.status)}</div>` : ''}
     </div>
     <div class="wo-card-foot">
       <div class="wo-checklist-bar">
@@ -2259,8 +2313,8 @@ function woCard(w) {
         <div class="checklist-mini"><div class="checklist-fill" style="width:${pct}%"></div></div>
         <span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--green)">${pct}%</span>
       </div>
-      <div onclick="event.stopPropagation()" style="display:flex;gap:4px">
-        <button class="btn-icon" onclick="openModal('wo','${w.id}')" title="Edit" style="width:26px;height:26px;font-size:12px">✏</button>
+      <div class="td-stopclick" style="display:flex;gap:4px">
+        <button class="btn-icon card-edit-btn td-stopclick" data-woid-b64="${woIdB64}" title="Edit" style="width:26px;height:26px;font-size:12px">✏</button>
       </div>
     </div>
   </div>`;
@@ -5133,24 +5187,21 @@ const _origShowDetail = showDetail;
 showDetail = function(woId) {
   _origShowDetail(woId);
 
-  // Inject rating block ke detail jika WO Done & ada teknisi
   setTimeout(() => {
     const wo = WO.workorders.find(w => w.id === woId);
     if (!wo || wo.status !== 'Done' || !wo.techId) return;
 
-    // Selalu hapus block lama dulu supaya state selalu fresh
     const old = document.getElementById('wo-rating-block');
     if (old) old.remove();
 
     const actionArea = document.querySelector('.status-actions');
     if (!actionArea) return;
 
-    const safeId = CSS.escape(woId); // handle karakter / dalam WO ID
     const ratingBlock = document.createElement('div');
     ratingBlock.id = 'wo-rating-block';
     ratingBlock.style.cssText = 'margin-bottom:20px;padding:14px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap';
 
-    // Simpan woId di dataset untuk diambil onclick tanpa masalah karakter /
+    // PENTING: simpan woId di dataset, BUKAN di onclick string
     ratingBlock.dataset.woId = woId;
 
     if (wo.rating) {
@@ -5168,20 +5219,25 @@ showDetail = function(woId) {
           ${wo.ratingComment ? `<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic">"${esc(wo.ratingComment)}"</div>` : ''}
           <div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:'IBM Plex Mono',monospace">oleh ${esc(wo.ratedBy||'—')} · ${wo.ratedAt||''}</div>
         </div>
-        <button class="btn-ghost" onclick="openRatingFromBlock()" style="white-space:nowrap">✏ Ubah Rating</button>`;
+        <button class="btn-ghost rating-block-btn">✏ Ubah Rating</button>`;
     } else {
       ratingBlock.innerHTML = `
         <div>
           <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">Rating Pengerjaan</div>
           <div style="font-size:12px;color:var(--text3)">Belum ada penilaian untuk teknisi ini.</div>
         </div>
-        <button class="btn-primary" onclick="openRatingFromBlock()" style="white-space:nowrap">⭐ Beri Rating</button>`;
+        <button class="btn-primary rating-block-btn">⭐ Beri Rating</button>`;
     }
+
+    // PENTING: pakai addEventListener bukan onclick attribute
+    // woId sudah tersimpan di ratingBlock.dataset.woId
+    ratingBlock.querySelector('.rating-block-btn').addEventListener('click', function() {
+      openRatingModal(ratingBlock.dataset.woId);
+    });
 
     actionArea.after(ratingBlock);
   }, 50);
 };
-
 // ═══════════════════════════════════════════════════════════════
 // PATCH: renderTechnicians — tambah kolom Avg Rating
 // (fully replaces original — no need to call _orig)
