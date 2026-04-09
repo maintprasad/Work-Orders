@@ -1939,28 +1939,22 @@ function renderDashboard() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RENDER: WO LIST
-// ═══════════════════════════════════════════════════════════════
 function renderWOList() {
-  // Populate dropdown filter dari data terbaru
   populateFilterDropdowns();
 
   const q       = (document.getElementById('woSearch')?.value || '').toLowerCase();
   const fStatus = document.getElementById('filterStatus')?.value || ST.filterStatus;
   const fType   = document.getElementById('filterType')?.value   || ST.filterType;
   const fPri    = document.getElementById('filterPriority')?.value || ST.filterPriority;
+  const fUnit   = document.getElementById('filterUnit')?.value      || ST.filterUnit      || '';
+  const fArea   = document.getElementById('filterArea')?.value      || ST.filterArea      || '';
+  const fReq    = document.getElementById('filterRequestor')?.value || ST.filterRequestor || '';
+  const fTech   = document.getElementById('filterTechnician')?.value|| ST.filterTechnician|| '';
 
-  const fUnit = document.getElementById('filterUnit')?.value      || ST.filterUnit      || '';
-  const fArea = document.getElementById('filterArea')?.value      || ST.filterArea      || '';
-  const fReq  = document.getElementById('filterRequestor')?.value || ST.filterRequestor || '';
-  const fTech = document.getElementById('filterTechnician')?.value|| ST.filterTechnician|| '';
-
-  // Tampilkan/sembunyikan tombol Reset
   const hasFilter = q || fStatus || fType || fPri || fUnit || fArea || fReq || fTech;
   const resetBtn = document.getElementById('btnResetFilter');
   if (resetBtn) resetBtn.style.display = hasFilter ? '' : 'none';
 
-  // Role-filtered base list
   let list = getVisibleWO().filter(w => {
     try {
       const wId    = (w.id    || '').toLowerCase();
@@ -1992,6 +1986,7 @@ function renderWOList() {
 
   setText('wo-count-label', list.length + ' work order');
   const container = document.getElementById('wo-list-container');
+
   if (!list.length) {
     const hasFilter = fStatus || fType || fPri || q;
     container.innerHTML = hasFilter
@@ -2012,6 +2007,7 @@ function renderWOList() {
     container.innerHTML = `<div class="tbl-wrap"><table class="data-table"><thead><tr>
       <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Equipment</th><th>Unit</th><th>Teknisi</th><th>Status</th><th>Due</th><th></th>
     </tr></thead><tbody>${list.map(w => woTableRow(w, true)).join('')}</tbody></table></div>`;
+    attachTableEvents(); // ← BARIS BARU INI SAJA
   }
 }
 
@@ -2107,21 +2103,24 @@ function woTableRow(w, showActions = false) {
   if (due) due.setHours(0,0,0,0);
   const isOverdue  = due && due < today && w.status !== 'Done' && w.status !== 'Cancelled';
   const isDueToday = due && due.getTime() === today.getTime() && w.status !== 'Done' && w.status !== 'Cancelled';
-  const rowStyle = isOverdue ? 'style="background:rgba(192,57,43,.04)"' : isDueToday ? 'style="background:rgba(251,140,58,.04)"' : '';
+  const rowBg = isOverdue ? 'background:rgba(192,57,43,.04)' : isDueToday ? 'background:rgba(251,140,58,.04)' : '';
   const nextStatuses = {Open:['In Progress','Cancelled'],'In Progress':['Done','Cancelled'],Done:[],Cancelled:[]};
   const nextOpts = (nextStatuses[w.status]||[]).map(s => `<option value="${s}">${s}</option>`).join('');
 
-  return `<tr data-wo-id="${esc(w.id)}" onclick="showDetail('${esc(w.id)}')" ${rowStyle} style="cursor:pointer${isOverdue?' background:rgba(192,57,43,.04)':isDueToday?' background:rgba(251,140,58,.04)':''}">
-    <td onclick="event.stopPropagation()">
+  // Encode WO ID ke base64 untuk data attribute — hindari masalah karakter / ' "
+  const woIdB64 = btoa(unescape(encodeURIComponent(w.id)));
+
+  return `<tr class="wo-row" data-woid-b64="${woIdB64}" style="cursor:pointer;${rowBg}">
+    <td class="td-nowoid">
       <span class="td-code">${esc(w.id)}</span>
-      <button class="copy-btn" onclick="copyWOId('${esc(w.id)}',this)" title="Salin WO ID">⎘</button>
+      <button class="copy-btn td-stopclick" title="Salin WO ID" data-copy="${esc(w.id)}">⎘</button>
     </td>
     <td>
       <div style="font-weight:500;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
       ${totalCount ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">✓ ${doneCount}/${totalCount} tasks</div>` : ''}
     </td>
     <td>
-      <div style="font-size:12px;font-weight:500;color:var(--text)">${esc(reqName)}</div>
+      <div style="font-size:12px;font-weight:500">${esc(reqName)}</div>
       ${reqDept ? `<div style="font-size:10px;color:var(--text3);margin-top:1px">${esc(reqDept)}</div>` : ''}
     </td>
     <td>${badgeType(w.type)}</td>
@@ -2130,26 +2129,100 @@ function woTableRow(w, showActions = false) {
     <td><span style="font-size:12px;color:var(--text2)">${esc(equip||'—')}</span></td>
     <td><span class="td-mono" style="font-size:10px">${esc(w.unitId ? getUnitName(w.unitId) : '—')}</span></td>` : ''}
     <td><span style="font-size:12px;color:var(--text2)">${esc(tech||'—')}</span></td>
-    <td onclick="event.stopPropagation()">
+    <td class="td-stopclick">
       ${nextOpts ? `<div style="display:flex;align-items:center;gap:5px">
         ${badgeStatus(w.status)}
-        <select class="fsel" style="font-size:12px;padding:4px 8px;height:30px;border-radius:5px;min-width:60px;border-color:var(--green);color:var(--green2);background:var(--green-light)"
-          title="Ubah status"
-          onchange="quickStatusChange('${esc(w.id)}',this.value);this.value=''">
+        <select class="fsel td-statussel" data-woid-b64="${woIdB64}"
+          style="font-size:12px;padding:4px 8px;height:30px;border-radius:5px;min-width:60px;border-color:var(--green);color:var(--green2);background:var(--green-light)"
+          title="Ubah status">
           <option value="" disabled selected>▼</option>
           ${nextOpts}
         </select>
       </div>` : badgeStatus(w.status)}
     </td>
     <td>${dueLabelHtml(w.dueDate, w.status)}</td>
-    ${showActions ? `<td onclick="event.stopPropagation()"><div class="tbl-actions">
-      <button class="btn-icon view" onclick="showDetail('${esc(w.id)}')" title="Detail">👁</button>
-      <button class="btn-icon" onclick="openModal('wo','${esc(w.id)}')" title="Edit">✏</button>
-      <button class="btn-icon del" onclick="deleteWO('${esc(w.id)}')" title="Hapus">✕</button>
+    ${showActions ? `<td class="td-stopclick"><div class="tbl-actions">
+      <button class="btn-icon view td-btn-detail" data-woid-b64="${woIdB64}" title="Detail">👁</button>
+      <button class="btn-icon td-btn-edit" data-woid-b64="${woIdB64}" title="Edit">✏</button>
+      <button class="btn-icon del td-btn-del" data-woid-b64="${woIdB64}" title="Hapus">✕</button>
     </div></td>` : ''}
   </tr>`;
 }
 
+   // Event delegation untuk tabel WO — menghindari masalah karakter / dalam WO ID
+function attachTableEvents() {
+  const container = document.getElementById('wo-list-container');
+  if (!container) return;
+
+  // Hapus listener lama (clone trick)
+  const fresh = container.cloneNode(true);
+  container.parentNode.replaceChild(fresh, container);
+
+  // Re-attach ke elemen baru
+  const el = document.getElementById('wo-list-container');
+
+  el.addEventListener('click', function(e) {
+    // Tombol copy
+    const copyBtn = e.target.closest('.copy-btn[data-copy]');
+    if (copyBtn) {
+      e.stopPropagation();
+      const id = copyBtn.dataset.copy;
+      navigator.clipboard.writeText(id).catch(() => {});
+      copyBtn.textContent = '✓';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = '⎘'; copyBtn.classList.remove('copied'); }, 1500);
+      return;
+    }
+
+    // Tombol detail 👁
+    const detailBtn = e.target.closest('.td-btn-detail[data-woid-b64]');
+    if (detailBtn) {
+      e.stopPropagation();
+      showDetail(decodeURIComponent(escape(atob(detailBtn.dataset.woidB64))));
+      return;
+    }
+
+    // Tombol edit ✏
+    const editBtn = e.target.closest('.td-btn-edit[data-woid-b64]');
+    if (editBtn) {
+      e.stopPropagation();
+      openModal('wo', decodeURIComponent(escape(atob(editBtn.dataset.woidB64))));
+      return;
+    }
+
+    // Tombol hapus ✕
+    const delBtn = e.target.closest('.td-btn-del[data-woid-b64]');
+    if (delBtn) {
+      e.stopPropagation();
+      deleteWO(decodeURIComponent(escape(atob(delBtn.dataset.woidB64))));
+      return;
+    }
+
+    // Klik td yang harus stop propagation
+    if (e.target.closest('.td-stopclick')) {
+      e.stopPropagation();
+      return;
+    }
+
+    // Klik row → buka detail
+    const row = e.target.closest('tr.wo-row[data-woid-b64]');
+    if (row) {
+      showDetail(decodeURIComponent(escape(atob(row.dataset.woidB64))));
+    }
+  });
+
+  // Status dropdown change
+  el.addEventListener('change', function(e) {
+    const sel = e.target.closest('.td-statussel[data-woid-b64]');
+    if (sel && sel.value) {
+      const woId = decodeURIComponent(escape(atob(sel.dataset.woidB64)));
+      quickStatusChange(woId, sel.value);
+      sel.value = '';
+    }
+  });
+}
+
+   
 function woCard(w) {
   const pColor = {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'};
   const done  = w.checklist?.filter(c => c.done).length || 0;
