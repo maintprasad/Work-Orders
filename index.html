@@ -2102,20 +2102,19 @@ function woTableRow(w, showActions = false) {
   const totalCount = w.checklist?.length || 0;
   const reqName = w.requestorName || '—';
   const reqDept = w.requestorDept || '';
-  // Overdue check
   const today = new Date(); today.setHours(0,0,0,0);
   const due   = w.dueDate ? new Date(w.dueDate) : null;
   if (due) due.setHours(0,0,0,0);
   const isOverdue  = due && due < today && w.status !== 'Done' && w.status !== 'Cancelled';
   const isDueToday = due && due.getTime() === today.getTime() && w.status !== 'Done' && w.status !== 'Cancelled';
-  const rowClass = isOverdue ? 'style="background:rgba(192,57,43,.04)"' : isDueToday ? 'style="background:rgba(251,140,58,.04)"' : '';
-  // Quick status options
+  const rowStyle = isOverdue ? 'style="background:rgba(192,57,43,.04)"' : isDueToday ? 'style="background:rgba(251,140,58,.04)"' : '';
   const nextStatuses = {Open:['In Progress','Cancelled'],'In Progress':['Done','Cancelled'],Done:[],Cancelled:[]};
   const nextOpts = (nextStatuses[w.status]||[]).map(s => `<option value="${s}">${s}</option>`).join('');
-  return `<tr onclick="showDetail('${w.id}')" ${rowClass}>
+
+  return `<tr data-wo-id="${esc(w.id)}" onclick="showDetail('${esc(w.id)}')" ${rowStyle} style="cursor:pointer${isOverdue?' background:rgba(192,57,43,.04)':isDueToday?' background:rgba(251,140,58,.04)':''}">
     <td onclick="event.stopPropagation()">
       <span class="td-code">${esc(w.id)}</span>
-      <button class="copy-btn" onclick="copyWOId('${w.id}',this)" title="Salin WO ID">⎘</button>
+      <button class="copy-btn" onclick="copyWOId('${esc(w.id)}',this)" title="Salin WO ID">⎘</button>
     </td>
     <td>
       <div style="font-weight:500;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
@@ -2136,7 +2135,7 @@ function woTableRow(w, showActions = false) {
         ${badgeStatus(w.status)}
         <select class="fsel" style="font-size:12px;padding:4px 8px;height:30px;border-radius:5px;min-width:60px;border-color:var(--green);color:var(--green2);background:var(--green-light)"
           title="Ubah status"
-          onchange="quickStatusChange('${w.id}',this.value);this.value=''">
+          onchange="quickStatusChange('${esc(w.id)}',this.value);this.value=''">
           <option value="" disabled selected>▼</option>
           ${nextOpts}
         </select>
@@ -2144,9 +2143,9 @@ function woTableRow(w, showActions = false) {
     </td>
     <td>${dueLabelHtml(w.dueDate, w.status)}</td>
     ${showActions ? `<td onclick="event.stopPropagation()"><div class="tbl-actions">
-      <button class="btn-icon view" onclick="showDetail('${w.id}')" title="Detail">👁</button>
-      <button class="btn-icon" onclick="openModal('wo','${w.id}')" title="Edit">✏</button>
-      <button class="btn-icon del" onclick="deleteWO('${w.id}')" title="Hapus">✕</button>
+      <button class="btn-icon view" onclick="showDetail('${esc(w.id)}')" title="Detail">👁</button>
+      <button class="btn-icon" onclick="openModal('wo','${esc(w.id)}')" title="Edit">✏</button>
+      <button class="btn-icon del" onclick="deleteWO('${esc(w.id)}')" title="Hapus">✕</button>
     </div></td>` : ''}
   </tr>`;
 }
@@ -3372,16 +3371,14 @@ async function handleAttachment(event, woId) {
 
     if (progressFill) progressFill.style.width = '60%';
 
-    // Upload ke GAS via POST
-    // GAS tidak support CORS untuk POST → pakai teknik fetch dengan redirect handling
     const controller = new AbortController();
     const timeout    = setTimeout(() => controller.abort(), 60000);
     let result;
     try {
-      // Coba POST dulu (works jika GAS sudah dikonfigurasi dengan benar)
+     
       const resp = await fetch(CFG.apiUrl, {
         method:  'POST',
-        headers: { 'Content-Type': 'text/plain' }, // text/plain bypass CORS preflight
+        headers: { 'Content-Type': 'text/plain' }, 
         body:    JSON.stringify({
           fn:         'upload_attachment',
           woId:       woId,
@@ -3435,13 +3432,13 @@ async function deleteAttachmentFile(woId, fileId, fileName) {
   const wo = WO.workorders.find(w => w.id === woId);
   if (!wo) return;
 
-  // Hapus dari array lokal
+ 
   wo.attachments = (wo.attachments||[]).filter(a => a.id !== fileId);
   addAudit(wo, 'note', `Lampiran dihapus: ${fileName}`);
   saveLocal(); showDetail(woId); syncUpsertWO(wo);
   toast('Lampiran dihapus', 'warn');
 
-  // Hapus dari Drive di background (non-blocking)
+
   if (fileId) {
     try {
       await _fetchSilent(CFG.apiUrl, { fn: 'delete_attachment', fileId });
@@ -3490,18 +3487,6 @@ function addAudit(wo, type, msg) {
   wo.audit = wo.audit || [];
   wo.audit.push({ ts: fmtTs(), type, msg });
 }
-
-// ═══════════════════════════════════════════════════════════════
-// API SYNC — Queue-based background sync (non-blocking)
-// ═══════════════════════════════════════════════════════════════
-//
-// STRATEGI:
-// 1. Setiap perubahan langsung simpan ke localStorage (instant)
-// 2. Perubahan masuk ke SYNC_QUEUE
-// 3. Queue diproses di background tiap DEBOUNCE_MS (default 2 detik)
-//    — beberapa perubahan cepat digabung jadi 1 request
-// 4. UI tidak pernah nunggu network
-// ═══════════════════════════════════════════════════════════════
 
 const SYNC = {
   queue:       {},     // { woId: 'upsert'|'delete', techId: 'upsert' }
