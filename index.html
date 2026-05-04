@@ -720,7 +720,6 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="sb-section" id="filter-section" style="display:none">
     <div class="sb-label">Filter Status</div>
     <div class="sb-item" onclick="filterWO('Open')"><span class="sb-icon" style="color:var(--blue)">🔵</span>Open<span class="sb-count" id="cnt-open">0</span></div>
-    <div class="sb-item" onclick="filterWO('In Progress')"><span class="sb-icon" style="color:var(--accent)">🟡</span>In Progress<span class="sb-count" id="cnt-inprogress">0</span></div>
     <div class="sb-item" onclick="filterWO('Done')"><span class="sb-icon" style="color:var(--green)">🟢</span>Done<span class="sb-count" id="cnt-done">0</span></div>
   </div>
 
@@ -799,7 +798,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
       <option value="">Semua Status</option>
       <option value="active">Aktif</option>
       <option>Open</option>
-      <option>In Progress</option><option>Done</option><option>Cancelled</option>
+      <option>Done</option><option>Cancelled</option>
     </select>
     <select class="fsel" id="filterType" onchange="renderWOList()">
       <option value="">Semua Tipe</option>
@@ -2105,7 +2104,7 @@ function woTableRow(w, showActions = false) {
   const isOverdue  = due && due < today && w.status !== 'Done' && w.status !== 'Cancelled';
   const isDueToday = due && due.getTime() === today.getTime() && w.status !== 'Done' && w.status !== 'Cancelled';
   const rowBg = isOverdue ? 'background:rgba(192,57,43,.04)' : isDueToday ? 'background:rgba(251,140,58,.04)' : '';
-  const nextStatuses = {Open:['In Progress','Cancelled'],'In Progress':['Done','Cancelled'],Done:[],Cancelled:[]};
+  const nextStatuses = {Open:['Done','Cancelled'],Done:[],Cancelled:[]};
   const nextOpts = (nextStatuses[w.status]||[]).map(s => `<option value="${s}">${s}</option>`).join('');
 
   // Encode WO ID ke base64 untuk data attribute — hindari masalah karakter / ' "
@@ -2334,7 +2333,7 @@ function showDetail(woId) {
   if (!wo) return;
   navigateTo('detail');
 
-  const STATUS_FLOW = ['Open', 'In Progress', 'Done'];
+  const STATUS_FLOW = ['Open', 'Done'];
   const curIdx = STATUS_FLOW.indexOf(wo.status);
   const pColor = {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'};
 
@@ -2358,8 +2357,7 @@ function showDetail(woId) {
     const s = wo.status;
     let primary = '';
     let danger  = '';
-    if (s === 'Open')        primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','In Progress','note')">▶ Mulai Kerjakan</button>`;
-    if (s === 'In Progress') primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Done','done')">✅ Tandai Selesai</button>`;
+  if (s === 'Open') primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Done','done')">✅ Tandai Selesai</button>`;
     if (s !== 'Done' && s !== 'Cancelled')
       danger = `<button class="btn-action-danger" onclick="changeStatus('${woId}','Cancelled','note')">✕ Batalkan WO</button>`;
     if (s === 'Done' || s === 'Cancelled')
@@ -2368,14 +2366,14 @@ function showDetail(woId) {
   })();
 
   const clHtml = (wo.checklist||[]).map(ci => `
-    <div class="checklist-item" onclick="toggleChecklist('${woId}','${ci.id}')">
+    <div class="checklist-item" ${SESSION?.role !== 'User' ? `onclick="toggleChecklist('${woId}','${ci.id}')"` : ''} style="${SESSION?.role === 'User' ? 'cursor:default' : ''}">
       <div class="ci-cb ${ci.done ? 'checked' : ''}"></div>
       <div style="flex:1">
         <div class="ci-text ${ci.done ? 'checked' : ''}">${esc(ci.text)}</div>
         ${ci.note ? `<div class="ci-note">${esc(ci.note)}</div>` : ''}
       </div>
-      <button class="btn-icon del" onclick="event.stopPropagation();deleteChecklist('${woId}','${ci.id}')"
-        title="Hapus" style="width:22px;height:22px;font-size:11px">✕</button>
+      ${SESSION?.role !== 'User' ? `<button class="btn-icon del" onclick="event.stopPropagation();deleteChecklist('${woId}','${ci.id}')"
+  title="Hapus" style="width:22px;height:22px;font-size:11px">✕</button>` : ''}
     </div>`).join('');
 
   const puHtml = (wo.partsUsed||[]).length === 0
@@ -2475,11 +2473,11 @@ function showDetail(woId) {
               <div class="checklist-progress">${doneCount}/${totalCount} — ${pct}%</div>
             </div>
             <div class="checklist-bar-wrap"><div class="checklist-bar-fill" style="width:${pct}%"></div></div>
-            ${wo.status !== 'Done' && wo.status !== 'Cancelled'
-              ? `<div class="add-checklist">
-                  <input type="text" id="quick-cl-${wo.id}" placeholder="Tambah task baru... (Enter)" onkeydown="if(event.key==='Enter')quickAddChecklist('${wo.id}')"/>
-                  <button class="btn-ghost" onclick="quickAddChecklist('${wo.id}')">+</button>
-                </div>` : ''}
+            ${wo.status !== 'Done' && wo.status !== 'Cancelled' && SESSION?.role !== 'User'
+  ? `<div class="add-checklist">
+      <input type="text" id="quick-cl-${wo.id}" placeholder="Tambah task baru... (Enter)" onkeydown="if(event.key==='Enter')quickAddChecklist('${wo.id}')"/>
+      <button class="btn-ghost" onclick="quickAddChecklist('${wo.id}')">+</button>
+    </div>` : ''}
             ${clHtml || '<div class="empty" style="padding:20px"><div class="empty-msg">Belum ada task.</div></div>'}
           </div>
         </div>
@@ -3210,7 +3208,6 @@ function deleteTech(id) {
 function changeStatus(woId, newStatus, noteType) {
   const wo = WO.workorders.find(w => w.id === woId);
   if (!wo) return;
-  if (newStatus === 'In Progress' && noteType === 'note') { openNoteModal(woId, 'note'); return; }
   if (newStatus === 'Done'        && noteType === 'done') { openNoteModal(woId, 'done'); return; }
   if (newStatus === 'Cancelled'   && noteType === 'note') { openNoteModal(woId, 'note'); return; }
   const old = wo.status;
