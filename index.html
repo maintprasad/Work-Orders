@@ -3795,7 +3795,7 @@ function normalizeWOFromSheets(w) {
     actualHours:   t(w.actualHours),
     startTime:     t(w.startTime),
     endTime:       t(w.endTime),
-    checklist:     tryParseArr(w.checklist),
+    checklist:     parseChecklistFromSheets(w.checklist),
     partsUsed:     tryParseArr(w.partsUsed),
     notesLog:      tryParseArr(w.notesLog),
     attachments:   tryParseArr(w.attachments),
@@ -3851,7 +3851,27 @@ function syncUpsertTech(t)  { queueSyncTech(t); }
 // ═══════════════════════════════════════════════════════════════
 // HELPERS / BADGES
 // ═══════════════════════════════════════════════════════════════
-function getEquipName(equipId) {
+// ── Parse checklist dari format Sheets → array object ──
+function parseChecklistFromSheets(val) {
+  if (Array.isArray(val)) return val;
+  if (!val || val === '') return [];
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  const items = val.split('|').map(s => s.trim()).filter(Boolean);
+  return items.map((item, idx) => {
+    const isDone = /^\[[\u2713\u221av]\]/i.test(item) || item.startsWith('[✓]');
+    const text = item
+      .replace(/^\[[\u2713\u221av]\]\s*/i, '')
+      .replace(/^\[\s*\]\s*/, '')
+      .trim();
+    if (!text) return null;
+    return { id: 'cl-' + idx + '-' + Date.now(), text, note: '', done: isDone };
+  }).filter(Boolean);
+}
+   
+   function getEquipName(equipId) {
   if (!equipId) return '';
   return (EQUIP_DB.equipment||[]).find(e => e.id === equipId)?.name || equipId;
 }
