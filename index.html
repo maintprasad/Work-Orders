@@ -3859,14 +3859,18 @@ function parseChecklistFromSheets(val) {
     const parsed = JSON.parse(val);
     if (Array.isArray(parsed)) return parsed;
   } catch {}
-  const items = val.split('|').map(s => s.trim()).filter(Boolean);
-  return items.map((item, idx) => {
-    const isDone = /^\[[\u2713\u221av]\]/i.test(item) || item.startsWith('[✓]');
-    const text = item
-      .replace(/^\[[\u2713\u221av]\]\s*/i, '')
-      .replace(/^\[\s*\]\s*/, '')
-      .trim();
+
+  return String(val).split('|').map((item, idx) => {
+    const s = item.trim();
+    if (!s) return null;
+
+    // [ ] = belum done, [✓] [√] [v] [x] dll = done
+    const isDone = /^\[\s*[^\s\]]\s*\]/.test(s);
+
+    // Hapus prefix [...] apapun isinya
+    const text = s.replace(/^\[.*?\]\s*/, '').trim();
     if (!text) return null;
+
     return { id: 'cl-' + idx + '-' + Date.now(), text, note: '', done: isDone };
   }).filter(Boolean);
 }
