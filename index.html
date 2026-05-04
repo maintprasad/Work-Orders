@@ -751,16 +751,12 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="stat-val" id="s-total"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
       <div class="stat-sub">semua work order</div>
     </div>
-    <div class="stat-card c-yellow" onclick="filterWO('In Progress')">
-      <div class="stat-lbl">In Progress</div>
-      <div class="stat-val" id="s-inprogress"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
-      <div class="stat-sub">sedang dikerjakan</div>
-    </div>
     <div class="stat-card c-green" onclick="filterWO('Done')">
       <div class="stat-lbl">Done (Bulan Ini)</div>
       <div class="stat-val" id="s-done-month"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
       <div class="stat-sub" id="s-done-rate">— completion rate</div>
     </div>
+     
     <div class="stat-card c-orange" onclick="filterWO('Open')">
       <div class="stat-lbl">Open</div>
       <div class="stat-val" id="s-open"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
@@ -1923,7 +1919,6 @@ function renderDashboard() {
   const rate  = Math.round(done / total * 100);
 
   setText('s-total',      all.length);
-  setText('s-inprogress', all.filter(w => w.status === 'In Progress').length);
   setText('s-done-month', doneThisMonth);
   setText('s-done-rate',  rate + '% completion rate');
   setText('s-open',       all.filter(w => w.status === 'Open').length);
