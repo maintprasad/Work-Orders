@@ -790,6 +790,11 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div class="stat-lbl">Open</div>
       <div class="stat-val" id="s-open"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
     </div>
+    <div class="stat-card c-red" onclick="navigateTo('wo-list')">
+      <div class="stat-lbl">Total Downtime (Troubleshooting)</div>
+      <div class="stat-val" id="s-downtime">—</div>
+      <div class="stat-sub" id="s-downtime-sub">menit (durasi &gt; 3 jam)</div>
+    </div>
   </div>
 
   <div class="sec-hdr" style="margin-bottom:14px">
@@ -2044,13 +2049,24 @@ function renderDashboard() {
   setText('s-total',      all.length);
   setText('s-done-month', doneThisMonth);
   setText('s-done-rate',  rate + '% completion rate');
-  setText('s-open',       all.filter(w => w.status === 'Open').length);
+  setText('s-open', all.filter(w => w.status === 'Open').length);
+
+  // Hitung downtime: hanya WO Troubleshooting dengan actualHours > 3
+  const downtimeWOs = all.filter(w => w.type === 'Troubleshooting' && parseFloat(w.actualHours) > 3);
+  const totalDowntimeMinutes = downtimeWOs.reduce((sum, w) => {
+    const over = (parseFloat(w.actualHours) - 3) * 60;
+    return sum + over;
+  }, 0);
+  const dtHours = Math.floor(totalDowntimeMinutes / 60);
+  const dtMins  = Math.round(totalDowntimeMinutes % 60);
+  setText('s-downtime', dtHours > 0 ? `${dtHours}j ${dtMins}m` : `${Math.round(totalDowntimeMinutes)}m`);
+  setText('s-downtime-sub', `dari ${downtimeWOs.length} WO troubleshooting`);
 
   const recent = [...all].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
   const el = document.getElementById('dash-recent-wo');
   if (!recent.length) { el.innerHTML = emptyState('📋', 'Belum ada Work Order'); return; }
   el.innerHTML = `<div class="tbl-wrap"><table class="data-table"><thead><tr>
-    <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Teknisi</th><th>Status</th><th>Due</th>
+    <th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Teknisi</th><th>Status</th><th>Due</th>
   </tr></thead><tbody>${recent.map(w => woTableRow(w, false)).join('')}</tbody></table></div>`;
 }
 
@@ -2123,7 +2139,7 @@ function renderWOList() {
   } else {
     // FIX: tidak ada onclick di dalam woTableRow(), semua ditangani attachTableEvents()
     container.innerHTML = `<div class="tbl-wrap"><table class="data-table"><thead><tr>
-      <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Equipment</th><th>Unit</th><th>Teknisi</th><th>Status</th><th>Due</th><th></th>
+      <th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Equipment</th><th>Unit</th><th>Catatan</th><th>Status</th><th>Due</th><th></th>
     </tr></thead><tbody>${list.map(w => woTableRow(w, true)).join('')}</tbody></table></div>`;
     attachTableEvents();
   }
@@ -2228,10 +2244,6 @@ function woTableRow(w, showActions = false) {
   const woIdB64 = btoa(unescape(encodeURIComponent(w.id)));
 
   return `<tr class="wo-row" data-woid-b64="${woIdB64}" style="cursor:pointer;${rowBg}">
-    <td class="td-nowoid">
-      <span class="td-code">${esc(w.id)}</span>
-      <button class="copy-btn td-stopclick" title="Salin WO ID" data-copy="${esc(w.id)}">⎘</button>
-    </td>
     <td>
       <div style="font-weight:500;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
       ${totalCount ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">✓ ${doneCount}/${totalCount} tasks</div>` : ''}
@@ -2245,17 +2257,9 @@ function woTableRow(w, showActions = false) {
     ${showActions ? `
     <td><span style="font-size:12px;color:var(--text2)">${esc(equip||'—')}</span></td>
     <td><span class="td-mono" style="font-size:10px">${esc(w.unitId ? getUnitName(w.unitId) : '—')}</span></td>` : ''}
-    <td><span style="font-size:12px;color:var(--text2)">${esc(tech||'—')}</span></td>
+    <td><span style="font-size:12px;color:var(--text2);max-width:160px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(w.notes||'')}">${esc(w.notes ? w.notes.substring(0,60) + (w.notes.length > 60 ? '…' : '') : '—')}</span></td>
     <td class="td-stopclick">
-      ${nextOpts ? `<div style="display:flex;align-items:center;gap:5px">
-        ${badgeStatus(w.status)}
-        <select class="fsel td-statussel" data-woid-b64="${woIdB64}"
-          style="font-size:12px;padding:4px 8px;height:30px;border-radius:5px;min-width:60px;border-color:var(--green);color:var(--green2);background:var(--green-light)"
-          title="Ubah status">
-          <option value="" disabled selected>▼</option>
-          ${nextOpts}
-        </select>
-      </div>` : badgeStatus(w.status)}
+      ${badgeStatus(w.status)}
     </td>
     <td>${dueLabelHtml(w.dueDate, w.status)}</td>
     ${showActions ? `<td class="td-stopclick"><div class="tbl-actions">
