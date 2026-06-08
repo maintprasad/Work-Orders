@@ -4782,7 +4782,7 @@ async function buildAndDownloadPPT(d) {
   if (typeof PptxGenJS === 'undefined') {
     await new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.11.0/pptxgen.bundle.js';
+      s.src = 'https://unpkg.com/pptxgenjs@3.11.0/dist/pptxgen.bundle.js';
       s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
