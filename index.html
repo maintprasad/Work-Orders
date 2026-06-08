@@ -801,9 +801,8 @@ input:checked + .slider:before{transform:translateX(18px)}
   <!-- MENU UTAMA — Semua Role -->
   <div class="sb-section">
     <div class="sb-label">Menu Utama</div>
-    <div class="sb-item" id="nav-submit-wo" onclick="openModal('wo',null)"><span class="sb-icon">✏</span>Submit WO</div>
     <div class="sb-item" id="nav-progress-wo" data-page="wo-list"><span class="sb-icon">📋</span>Progress WO<span class="sb-count" id="cnt-all">0</span></div>
-<div class="sb-item" id="nav-comparison" data-page="comparison"><span class="sb-icon">📊</span>Comparison</div>
+<div class="sb-item" id="nav-comparison" data-page="comparison"><span class="sb-icon">📊</span>in / out</div>
   </div>
 
   <!-- ADMIN PANEL — hanya Admin -->
@@ -816,9 +815,6 @@ input:checked + .slider:before{transform:translateX(18px)}
 
   <!-- STATUS FILTER — Maintenance + Admin -->
   <div class="sb-section" id="filter-section" style="display:none">
-    <div class="sb-label">Filter Status</div>
-    <div class="sb-item" onclick="filterWO('Open')"><span class="sb-icon" style="color:var(--blue)">🔵</span>Open<span class="sb-count" id="cnt-open">0</span></div>
-    <div class="sb-item" onclick="filterWO('Done')"><span class="sb-icon" style="color:var(--green)">🟢</span>Done<span class="sb-count" id="cnt-done">0</span></div>
   </div>
 
   <!-- MAINTENANCE TOOLS — Maintenance role -->
