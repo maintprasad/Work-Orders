@@ -447,6 +447,33 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   cursor:pointer;transition:all .15s;white-space:nowrap}
 .logout-btn:hover{border-color:var(--red);color:var(--red)}
 
+/* ── UNIT SELECTOR OVERLAY ── */
+#unit-selector-overlay{position:fixed;inset:0;background:linear-gradient(135deg,#0d1e3a 0%,#1a3a6b 60%,#2a5a3a 100%);
+  z-index:999;display:flex;align-items:center;justify-content:center;padding:20px}
+.unit-sel-card{background:rgba(255,255,255,.97);border-radius:14px;padding:36px 40px;
+  width:100%;max-width:440px;box-shadow:0 24px 64px rgba(0,0,0,.35);position:relative;overflow:hidden;text-align:center}
+.unit-sel-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),var(--blue))}
+.unit-sel-title{font-size:20px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.unit-sel-sub{font-size:12px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:28px}
+.unit-sel-btns{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.unit-btn{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:22px 16px;
+  cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;
+  letter-spacing:.05em;transition:all .18s;box-shadow:0 4px 14px rgba(26,58,107,.3)}
+.unit-btn:hover{background:#2a5a9b;transform:translateY(-2px);box-shadow:0 8px 22px rgba(26,58,107,.4)}
+.unit-btn .unit-btn-ico{font-size:28px;display:block;margin-bottom:8px}
+.unit-btn .unit-btn-lbl{font-size:13px;font-weight:700;letter-spacing:.06em}
+.unit-btn.selected{background:var(--green);box-shadow:0 4px 14px rgba(74,158,63,.35)}
+
+/* Simple mode — hanya untuk role User & Maintenance */
+body.simple-mode .sidebar{display:none!important}
+body.simple-mode .sidebar-backdrop{display:none!important}
+body.simple-mode .ham-btn{display:none!important}
+body.simple-mode .layout{display:block!important}
+body.simple-mode .content{padding:16px!important;padding-bottom:70px!important}
+body.simple-mode .top-nav{display:none!important}
+body.simple-mode .mobile-nav{display:none!important}
+body.simple-mode-admin .sidebar{display:flex!important}
+
 /* ── ADMIN PANEL ── */
 .admin-badge{display:inline-block;background:rgba(74,158,63,.15);
   color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:9px;
@@ -565,6 +592,27 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   /* Stat chips lebih kecil */
   .stat-grid{grid-template-columns:repeat(2,1fr);gap:8px}
 }
+
+/* ── ADMIN REPORT PANEL ── */
+.report-action-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:20px 22px;display:flex;align-items:center;gap:18px;transition:all .15s;cursor:pointer;
+  position:relative;overflow:hidden}
+.report-action-card:hover{border-color:var(--green);box-shadow:var(--shadow);transform:translateY(-1px)}
+.report-action-card .rac-ico{font-size:32px;flex-shrink:0;width:50px;height:50px;
+  background:var(--green-light);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.report-action-card .rac-info{flex:1}
+.report-action-card .rac-title{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:4px}
+.report-action-card .rac-desc{font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;line-height:1.5}
+.report-action-card .rac-btns{display:flex;gap:8px;flex-shrink:0}
+.toggle-sw{position:relative;display:inline-block;width:40px;height:22px}
+.toggle-sw input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;transition:.3s;border-radius:22px}
+.slider:before{position:absolute;content:"";height:16px;width:16px;left:3px;bottom:3px;background:white;transition:.3s;border-radius:50%}
+input:checked + .slider{background:var(--green)}
+input:checked + .slider:before{transform:translateX(18px)}
+.notif-toggle-label{font-size:13px;font-weight:500;color:var(--text)}
+.notif-toggle-sub,.ntog-desc{font-size:11px;color:var(--text3);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+.notif-toggle-info{flex:1}
 
 /* ── COMPARISON CHART BARS ── */
 .cmp-bar-wrap{display:flex;align-items:flex-end;gap:3px;height:200px;padding-top:8px}
@@ -694,6 +742,30 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   </div>
 </div>
 
+<!-- ═══════════ UNIT SELECTOR ═══════════ -->
+<div id="unit-selector-overlay" style="display:none">
+  <div class="unit-sel-card">
+    <div class="login-logo" style="justify-content:center;margin-bottom:20px">
+      <div class="login-logo-dot"></div>
+      <div class="login-logo-text">PRASAD SEEDS — WO SYSTEM</div>
+    </div>
+    <div class="unit-sel-title">Pilih Unit</div>
+    <div class="unit-sel-sub" id="unit-sel-greeting">Selamat datang, —</div>
+    <div class="unit-sel-btns">
+      <button class="unit-btn" onclick="selectUnit('unit1','Unit 1')">
+        <span class="unit-btn-ico">🏭</span>
+        <span class="unit-btn-lbl">UNIT 1</span>
+      </button>
+      <button class="unit-btn" onclick="selectUnit('unit2','Unit 2')">
+        <span class="unit-btn-ico">🏗</span>
+        <span class="unit-btn-lbl">UNIT 2</span>
+      </button>
+    </div>
+    <button onclick="doLogout()" style="margin-top:20px;background:none;border:none;
+      font-size:12px;color:var(--text3);cursor:pointer;font-family:'IBM Plex Mono',monospace">⏻ Keluar</button>
+  </div>
+</div>
+
 <!-- ═══════════ TOPBAR ═══════════ -->
 <nav class="topbar">
   <div style="display:flex;align-items:center;gap:8px">
@@ -705,7 +777,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="top-nav">
     <button class="nav-btn active" id="topnav-wo" onclick="navigateTo('wo-list')">Progress WO</button>
 <button class="nav-btn" id="topnav-comparison" onclick="navigateTo('comparison')">📊 Comparison</button>
-    <button class="nav-btn" id="topnav-admin" style="display:none" onclick="navigateTo('user-management')">⚙ Admin</button>
+    <button class="nav-btn" id="topnav-admin" style="display:none" onclick="navigateTo('admin-panel')">⚙ Admin</button>
   </div>
   <div class="top-right">
     <span class="api-pill" id="apiPill" onclick="manualSync()" title="Klik untuk sync">⚠ No API</span>
@@ -737,13 +809,10 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
   <!-- ADMIN PANEL — hanya Admin -->
   <div class="sb-section" id="admin-section" style="display:none">
     <div class="sb-label">Admin Panel <span class="admin-badge">ADMIN</span></div>
-    <div class="sb-item" data-page="user-management"><span class="sb-icon">👥</span>Kelola User</div>
-    <div class="sb-item" data-page="notif-settings"><span class="sb-icon">🔔</span>Notifikasi WA</div>
+    <div class="sb-item" data-page="admin-panel"><span class="sb-icon">⚙</span>Admin Panel</div>
     <div class="sb-item" data-page="dashboard"><span class="sb-icon">◈</span>Dashboard</div>
     <div class="sb-item" data-page="technicians"><span class="sb-icon">👷</span>Teknisi</div>
-    <div class="sb-item" data-page="reports"><span class="sb-icon">📊</span>Reports</div>
-    <div class="sb-item" data-page="rating"><span class="sb-icon">⭐</span>Rating Teknisi</div>
-  </div>
+    </div>
 
   <!-- STATUS FILTER — Maintenance + Admin -->
   <div class="sb-section" id="filter-section" style="display:none">
@@ -818,21 +887,6 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
       <span style="color:var(--text3);font-size:13px">⌕</span>
       <input type="text" id="woSearch" placeholder="Cari WO ID, judul, requestor, equipment..." oninput="renderWOList()"/>
     </div>
-    <select class="fsel" id="filterStatus" onchange="renderWOList()">
-      <option value="">Semua Status</option>
-      <option value="active">Aktif</option>
-      <option>Open</option>
-      <option>Done</option><option>Cancelled</option>
-    </select>
-    <select class="fsel" id="filterType" onchange="renderWOList()">
-      <option value="">Semua Tipe</option>
-      <option>Troubleshooting</option>
-      <option>Improvement</option>
-    </select>
-    <select class="fsel" id="filterPriority" onchange="renderWOList()">
-      <option value="">Semua Prioritas</option>
-      <option>Low</option><option>Medium</option><option>High</option>
-    </select>
   </div>
 
   <!-- Filter baris 2: Unit, Area, Requestor, Teknisi -->
@@ -843,17 +897,20 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
     <select class="fsel" id="filterArea" onchange="renderWOList()" style="min-width:130px">
       <option value="">Semua Area</option>
     </select>
-    <select class="fsel" id="filterTechnician" onchange="renderWOList()" style="min-width:140px">
-      <option value="">Semua Teknisi</option>
-    </select>
-    <input type="text" class="fsel" id="filterRequestor"
-      placeholder="🔍 Requestor..."
-      oninput="renderWOList()"
-      style="min-width:140px;cursor:text"/>
     <button class="btn-ghost" id="btnResetFilter" onclick="resetAllFilters()"
       style="font-size:11px;padding:6px 12px;white-space:nowrap;display:none">
       ✕ Reset Filter
     </button>
+    <select class="fsel" id="filterStatus" onchange="renderWOList()">
+      <option value="">Semua Status</option>
+      <option>Open</option>
+      <option>Done</option><option>Cancelled</option>
+    </select>
+    <select class="fsel" id="filterType" onchange="renderWOList()">
+      <option value="">Semua Tipe</option>
+      <option>Troubleshooting</option>
+      <option>Improvement</option>
+    </select>
   </div>
 
   <div id="wo-list-container"></div>
@@ -934,6 +991,62 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
 </div>
 
 <!-- But first add the new pages inside main -->
+
+<!-- ─── PAGE: ADMIN PANEL ─── -->
+<div class="page" id="page-admin-panel">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Admin Panel <span class="admin-badge">ADMIN</span></div>
+      <div class="sec-sub">Kelola sistem, user, dan laporan</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:28px">
+    <div class="report-action-card" onclick="navigateTo('user-management')">
+      <div class="rac-ico">👥</div>
+      <div class="rac-info">
+        <div class="rac-title">Kelola User</div>
+        <div class="rac-desc">Tambah, edit, atau nonaktifkan akun pengguna sistem WO</div>
+      </div>
+      <div class="rac-btns"><button class="btn-ghost" onclick="event.stopPropagation();navigateTo('user-management')">Buka →</button></div>
+    </div>
+    <div class="report-action-card" onclick="navigateTo('notif-settings')">
+      <div class="rac-ico">🔔</div>
+      <div class="rac-info">
+        <div class="rac-title">Notifikasi WhatsApp</div>
+        <div class="rac-desc">Atur pengiriman notifikasi otomatis via WhatsApp Bot</div>
+      </div>
+      <div class="rac-btns"><button class="btn-ghost" onclick="event.stopPropagation();navigateTo('notif-settings')">Buka →</button></div>
+    </div>
+  </div>
+
+  <div class="sec-hdr" style="margin-bottom:14px">
+    <div class="sec-title" style="font-size:16px">📊 Cetak & Ekspor Laporan</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+    <!-- PDF Report -->
+    <div class="report-action-card">
+      <div class="rac-ico">📄</div>
+      <div class="rac-info">
+        <div class="rac-title">Laporan PDF</div>
+        <div class="rac-desc">Rekap WO lengkap per periode · Tabel + Grafik + Tanda Tangan</div>
+      </div>
+      <div class="rac-btns">
+        <button class="btn-primary" onclick="openPrintModal()" style="font-size:11px;padding:7px 14px">🖨 Cetak PDF</button>
+      </div>
+    </div>
+    <!-- PPT Report -->
+    <div class="report-action-card">
+      <div class="rac-ico">📊</div>
+      <div class="rac-info">
+        <div class="rac-title">Executive Report PowerPoint</div>
+        <div class="rac-desc">5 slide: Cover · Executive Summary · Grafik WO · Summary Unit 1 · Summary Unit 2</div>
+      </div>
+      <div class="rac-btns">
+        <button class="btn-primary" id="btn-gen-ppt" onclick="generateExecutivePPT()" style="font-size:11px;padding:7px 14px">⬇ Download PPT</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ─── PAGE: USER MANAGEMENT (Admin only) ─── -->
 <div class="page" id="page-user-management">
@@ -1997,6 +2110,7 @@ function navigateTo(page) {
   if (page === 'reports')          renderReports();
   if (page === 'rating')           renderRatingPage();
   if (page === 'comparison')       { initComparisonYearDropdown(); renderComparison(); }
+  if (page === 'admin-panel')      renderAdminPanel();
   if (page === 'user-management')  renderUserManagement();
   if (page === 'notif-settings')   renderNotifSettings();
 }
@@ -2093,10 +2207,7 @@ function renderWOList() {
     }
   });
 
-  list = list.sort((a,b) => {
-    const pOrd = {Critical:0,High:1,Medium:2,Low:3};
-    return (pOrd[a.priority]||2) - (pOrd[b.priority]||2) || new Date(b.createdAt) - new Date(a.createdAt);
-  });
+  list = list.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   setText('wo-count-label', list.length + ' work order');
   const container = document.getElementById('wo-list-container');
@@ -2121,7 +2232,7 @@ function renderWOList() {
   } else {
     // FIX: tidak ada onclick di dalam woTableRow(), semua ditangani attachTableEvents()
     container.innerHTML = `<div class="tbl-wrap"><table class="data-table"><thead><tr>
-      <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Equipment</th><th>Unit</th><th>Teknisi</th><th>Status</th><th>Due</th><th></th>
+      <th>Tanggal</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Equipment</th><th>Unit</th><th>Teknisi</th><th>Status</th><th>Due</th><th></th>
     </tr></thead><tbody>${list.map(w => woTableRow(w, true)).join('')}</tbody></table></div>`;
     attachTableEvents();
   }
@@ -2226,9 +2337,9 @@ function woTableRow(w, showActions = false) {
   const woIdB64 = btoa(unescape(encodeURIComponent(w.id)));
 
   return `<tr class="wo-row" data-woid-b64="${woIdB64}" style="cursor:pointer;${rowBg}">
-    <td class="td-nowoid">
-      <span class="td-code">${esc(w.id)}</span>
-      <button class="copy-btn td-stopclick" title="Salin WO ID" data-copy="${esc(w.id)}">⎘</button>
+    <td>
+      <div style="font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap">${fmtDate(w.createdAt)}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);margin-top:2px">${esc(w.id)}</div>
     </td>
     <td>
       <div style="font-weight:500;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
@@ -2244,17 +2355,7 @@ function woTableRow(w, showActions = false) {
     <td><span style="font-size:12px;color:var(--text2)">${esc(equip||'—')}</span></td>
     <td><span class="td-mono" style="font-size:10px">${esc(w.unitId ? getUnitName(w.unitId) : '—')}</span></td>` : ''}
     <td><span style="font-size:12px;color:var(--text2)">${esc(tech||'—')}</span></td>
-    <td class="td-stopclick">
-      ${nextOpts ? `<div style="display:flex;align-items:center;gap:5px">
-        ${badgeStatus(w.status)}
-        <select class="fsel td-statussel" data-woid-b64="${woIdB64}"
-          style="font-size:12px;padding:4px 8px;height:30px;border-radius:5px;min-width:60px;border-color:var(--green);color:var(--green2);background:var(--green-light)"
-          title="Ubah status">
-          <option value="" disabled selected>▼</option>
-          ${nextOpts}
-        </select>
-      </div>` : badgeStatus(w.status)}
-    </td>
+    <td>${badgeStatus(w.status)}</td>
     <td>${dueLabelHtml(w.dueDate, w.status)}</td>
     ${showActions ? `<td class="td-stopclick"><div class="tbl-actions">
       <button class="btn-icon view td-btn-detail" data-woid-b64="${woIdB64}" title="Detail">👁</button>
@@ -2289,8 +2390,7 @@ function attachTableEvents() {
       return;
     }
 
-     // Event delegation untuk card view — mirip attachTableEvents tapi untuk .wo-card-clickable
-function attachCardEvents() {
+     function attachCardEvents() {
   const container = document.getElementById('wo-list-container');
   if (!container) return;
 
@@ -2469,11 +2569,14 @@ function showDetail(woId) {
   }).join('');
 
   const actionBtns = (() => {
-    const s = wo.status;
+    const s    = wo.status;
+    const role = SESSION?.role;
+    const canClose = role === 'Admin' || role === 'Maintenance';
     let primary = '';
     let danger  = '';
-  if (s === 'Open') primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Done','done')">✅ Tandai Selesai</button>`;
-    if (s !== 'Done' && s !== 'Cancelled')
+    if (s === 'Open' && canClose)
+      primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Done','done')">✅ Tandai Selesai</button>`;
+    if (s !== 'Done' && s !== 'Cancelled' && canClose)
       danger = `<button class="btn-action-danger" onclick="changeStatus('${woId}','Cancelled','note')">✕ Batalkan WO</button>`;
     if (s === 'Done' || s === 'Cancelled')
       primary = `<span style="font-size:12px;color:var(--text3);font-family:'IBM Plex Mono',monospace;padding:8px 0;display:block">WO telah ${s === 'Done' ? '✅ selesai' : '❌ dibatalkan'}</span>`;
@@ -4280,6 +4383,63 @@ function saveNotifSettingsLocal(s) {
   localStorage.setItem(NOTIF_KEY, JSON.stringify(s));
 }
 
+// ── UNIT SELECTION ──
+let SELECTED_UNIT = null; // 'unit1' | 'unit2'
+
+function showUnitSelector() {
+  document.getElementById('unit-selector-overlay').style.display = 'flex';
+  const greeting = SESSION ? `Selamat datang, ${SESSION.nama} (${SESSION.role})` : 'Pilih unit untuk melanjutkan';
+  setText('unit-sel-greeting', greeting);
+}
+
+function selectUnit(unitId, unitName) {
+  SELECTED_UNIT = unitId;
+  document.getElementById('unit-selector-overlay').style.display = 'none';
+  SESSION.selectedUnit = unitId;
+  SESSION.selectedUnitName = unitName;
+  localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
+  // Simple mode hanya untuk User & Maintenance, bukan Admin/SPV
+  if (SESSION.role !== 'Admin' && SESSION.role !== 'SPV') {
+    applySimpleMode();
+  } else {
+    // Admin/SPV: cukup tambah unit pill di topbar, tampilan tetap full
+    addUnitPill(unitName);
+  }
+  applyRoleUI();
+  init();
+}
+
+function addUnitPill(unitName) {
+  if (document.getElementById('unit-pill')) return;
+  const brand = document.querySelector('.brand');
+  if (!brand || !unitName) return;
+  const pill = document.createElement('span');
+  pill.style.cssText = 'background:rgba(74,158,63,.2);color:#6fcf6f;font-family:"IBM Plex Mono",monospace;font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid rgba(74,158,63,.3);cursor:pointer';
+  pill.textContent = unitName;
+  pill.id = 'unit-pill';
+  pill.title = 'Klik untuk ganti unit';
+  pill.onclick = () => {
+    // Reset unit dan tampilkan selector lagi
+    SESSION.selectedUnit = null;
+    SESSION.selectedUnitName = null;
+    localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
+    pill.remove();
+    document.body.classList.remove('simple-mode');
+    showUnitSelector();
+  };
+  brand.appendChild(pill);
+}
+
+function applySimpleMode() {
+  document.body.classList.add('simple-mode');
+  addUnitPill(SESSION?.selectedUnitName || '');
+}
+
+// Cek apakah role perlu unit selector
+function needsUnitSelector(role) {
+  return role === 'Admin' || role === 'SPV';
+}
+
 // ── LOGIN — data user diambil dari Google Sheets, fallback ke cache lokal ──
 async function doLogin() {
   const username = document.getElementById('li-user').value.trim().toLowerCase();
@@ -4351,15 +4511,23 @@ async function doLogin() {
   localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
 
   document.getElementById('login-screen').style.display = 'none';
-  applyRoleUI();
-  init();
+
+  if (needsUnitSelector(SESSION.role)) {
+    // Tampilkan unit selector sebelum masuk
+    showUnitSelector();
+  } else {
+    applyRoleUI();
+    init();
+  }
 }
 
 function doLogout() {
   if (!confirm('Yakin ingin keluar?')) return;
-  // Clear session state terlebih dahulu sebelum reload
   SESSION = null;
+  SELECTED_UNIT = null;
   localStorage.removeItem(AUTH_KEY);
+  document.body.classList.remove('simple-mode');
+  document.getElementById('unit-selector-overlay').style.display = 'none';
   // Sembunyikan UI sensitif secara instan sebelum reload
   try {
     document.getElementById('user-badge').style.display = 'none';
@@ -4405,6 +4573,14 @@ function checkSession() {
 function applyRoleUI() {
   if (!SESSION) return;
   const role = SESSION.role;
+  // Inject style untuk blokir tombol tandai selesai bagi non-Maintenance di simple mode
+  const styleId = 'simple-mode-style';
+  let styleEl = document.getElementById(styleId);
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
 
   // Show user badge in topbar
   const badge = document.getElementById('user-badge');
@@ -4423,14 +4599,20 @@ function applyRoleUI() {
   if (role === 'Admin') {
     adminSection.style.display = '';
     filterSection.style.display = '';
-    if (topnavAdmin) topnavAdmin.style.display = '';
+    if (topnavAdmin) {
+      topnavAdmin.style.display = '';
+      topnavAdmin.onclick = () => navigateTo('admin-panel');
+    }
     const mnavAdmin = document.getElementById('mnav-admin');
-    if (mnavAdmin) mnavAdmin.style.display = '';
+    if (mnavAdmin) {
+      mnavAdmin.style.display = '';
+      mnavAdmin.onclick = () => navigateTo('admin-panel');
+    }
   } else if (role === 'Maintenance') {
     adminSection.style.display = 'none';
-    filterSection.style.display = '';
+    filterSection.style.display = 'none';
     const maintTools = document.getElementById('maintenance-tools-section');
-    if (maintTools) maintTools.style.display = '';
+    if (maintTools) maintTools.style.display = 'none';
     if (topnavAdmin) topnavAdmin.style.display = 'none';
     const mnavAdmin = document.getElementById('mnav-admin');
     if (mnavAdmin) mnavAdmin.style.display = 'none';
@@ -4455,15 +4637,485 @@ function applyRoleUI() {
 function getVisibleWO() {
   const all = WO.workorders;
   if (!SESSION) return [];
-  if (SESSION.role === 'User') {
-    // Hanya WO milik sendiri (berdasarkan requestorName atau createdBy)
-    return all.filter(w => w.createdBy === SESSION.userId || w.requestorName === SESSION.nama);
+
+  let list = all;
+
+  // Filter berdasarkan unit yang dipilih — berlaku SEMUA role termasuk Admin
+  if (SESSION.selectedUnit) {
+    const unitId = SESSION.selectedUnit;
+    // Cari unit yang cocok dari EQUIP_DB
+    const matchedUnit = (EQUIP_DB.units || []).find(u => {
+      const normalized = u.id.toLowerCase().replace(/[\s\-_]/g,'');
+      const uName      = u.name.toLowerCase();
+      if (unitId === 'unit1') return normalized.includes('unit1') || uName.includes('unit 1') || uName.includes('unit1') || (uName.includes('unit') && uName.includes('1'));
+      if (unitId === 'unit2') return normalized.includes('unit2') || uName.includes('unit 2') || uName.includes('unit2') || (uName.includes('unit') && uName.includes('2'));
+      return false;
+    });
+
+    if (matchedUnit) {
+      list = list.filter(w => w.unitId === matchedUnit.id);
+    } else {
+      // Fallback string match pada unitId field WO
+      const keywords = unitId === 'unit1' ? ['unit1','unit-1','unit_1'] : ['unit2','unit-2','unit_2'];
+      list = list.filter(w => {
+        if (!w.unitId) return false;
+        const n = w.unitId.toLowerCase().replace(/[\s]/g,'');
+        return keywords.some(k => n.includes(k));
+      });
+    }
   }
-  return all; // Admin & Maintenance lihat semua
+
+  // Role User: filter hanya WO milik sendiri (dari list yang sudah difilter unit)
+  if (SESSION.role === 'User') {
+    return list.filter(w => w.createdBy === SESSION.userId || w.requestorName === SESSION.nama);
+  }
+
+  return list; // Admin, SPV, Maintenance: semua WO di unit yang dipilih
 }
 
 // ═══════════════════════════════════════════════════════════════
-// USER MANAGEMENT
+// ADMIN PANEL
+// ═══════════════════════════════════════════════════════════════
+
+function renderAdminPanel() {
+  // Hanya refresh stat cards kecil jika diperlukan — page sudah static HTML
+  // Update button state berdasarkan data
+  const btn = document.getElementById('btn-gen-ppt');
+  if (btn) {
+    const total = WO.workorders.length;
+    btn.title = `Generate PPT dari ${total} Work Order`;
+  }
+}
+
+// ── Generate Executive PPT ──
+async function generateExecutivePPT() {
+  const btn = document.getElementById('btn-gen-ppt');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating...'; }
+
+  try {
+    // Kumpulkan data
+    const all = WO.workorders;
+    const now = new Date();
+    const nowStr = now.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+    const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+    // Helper stats per unit
+    function getUnitStats(unitKeyword) {
+      const unitObj = (EQUIP_DB.units||[]).find(u => {
+        const n = u.name.toLowerCase();
+        return unitKeyword === 'unit1'
+          ? (n.includes('unit 1') || n.includes('unit1') || (n.includes('unit') && n.includes('1') && !n.includes('2')))
+          : (n.includes('unit 2') || n.includes('unit2') || (n.includes('unit') && n.includes('2') && !n.includes('1')));
+      });
+      const list = unitObj
+        ? all.filter(w => w.unitId === unitObj.id)
+        : all.filter(w => {
+            if (!w.unitId) return false;
+            const n = w.unitId.toLowerCase().replace(/[\s]/g,'');
+            return unitKeyword === 'unit1' ? n.includes('unit1') : n.includes('unit2');
+          });
+      const done    = list.filter(w => w.status === 'Done').length;
+      const open    = list.filter(w => w.status === 'Open' || w.status === 'In Progress').length;
+      const high    = list.filter(w => w.priority === 'High' || w.priority === 'Critical').length;
+      const rate    = list.length ? Math.round(done / list.length * 100) : 0;
+      const avgHrs  = (() => {
+        const d = list.filter(w => w.status === 'Done' && parseFloat(w.actualHours) > 0);
+        if (!d.length) return 0;
+        return +(d.reduce((s,w) => s + parseFloat(w.actualHours||0), 0) / d.length).toFixed(1);
+      })();
+      // Top 5 equipment bermasalah
+      const equipCount = {};
+      list.forEach(w => {
+        if (!w.equipId) return;
+        const n = getEquipName(w.equipId) || w.equipId;
+        equipCount[n] = (equipCount[n]||0) + 1;
+      });
+      const topEquip = Object.entries(equipCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+      // WO per type
+      const troubleshoot = list.filter(w => w.type === 'Troubleshooting').length;
+      const improvement  = list.filter(w => w.type === 'Improvement').length;
+      return { list, done, open, high, rate, avgHrs, topEquip, troubleshoot, improvement, name: unitObj?.name || (unitKeyword === 'unit1' ? 'Unit 1' : 'Unit 2') };
+    }
+
+    // Monthly trend (12 bulan terakhir atau tahun ini)
+    const year = now.getFullYear();
+    const monthlyData = MONTHS.map((label, idx) => {
+      const masuk   = all.filter(w => { const d = new Date(w.createdAt); return d.getFullYear()===year && d.getMonth()===idx; }).length;
+      const selesai = all.filter(w => { if (w.status!=='Done') return false; const d = new Date(w.createdAt); return d.getFullYear()===year && d.getMonth()===idx; }).length;
+      return { label, masuk, selesai };
+    });
+
+    const totalAll   = all.length;
+    const doneAll    = all.filter(w => w.status === 'Done').length;
+    const openAll    = all.filter(w => w.status === 'Open' || w.status === 'In Progress').length;
+    const rateAll    = totalAll ? Math.round(doneAll / totalAll * 100) : 0;
+    const highAll    = all.filter(w => w.priority === 'High' || w.priority === 'Critical').length;
+    const avgHrsAll  = (() => {
+      const d = all.filter(w => w.status === 'Done' && parseFloat(w.actualHours) > 0);
+      if (!d.length) return 0;
+      return +(d.reduce((s,w)=>s+parseFloat(w.actualHours||0),0)/d.length).toFixed(1);
+    })();
+
+    const u1 = getUnitStats('unit1');
+    const u2 = getUnitStats('unit2');
+
+    // ── Build PPT menggunakan pptxgenjs via script worker ──
+    // Karena kita di browser, gunakan metode generate di JS murni lalu trigger download
+    await buildAndDownloadPPT({
+      nowStr, year, MONTHS, monthlyData,
+      totalAll, doneAll, openAll, rateAll, highAll, avgHrsAll,
+      u1, u2, operator: SESSION?.nama || 'Admin',
+    });
+
+    toast('✅ PPT berhasil di-generate & didownload', 'success');
+  } catch(e) {
+    console.error('PPT error:', e);
+    toast('❌ Gagal generate PPT: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Download PPT'; }
+  }
+}
+
+// ── Build PPT di browser via PptxGenJS CDN ──
+async function buildAndDownloadPPT(d) {
+  // Load PptxGenJS dari CDN kalau belum ada
+  if (typeof PptxGenJS === 'undefined') {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.11.0/pptxgen.bundle.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const pres = new PptxGenJS();
+  pres.layout  = 'LAYOUT_16x9';
+  pres.author  = 'PT Prasad Seeds Indonesia';
+  pres.title   = 'Executive Report — Work Order Maintenance';
+  pres.subject = `Laporan ${d.year}`;
+
+  // ── Palette ──
+  const C = {
+    navy:    '1A3A6B',
+    green:   '3DAA4C',
+    green2:  '2A8A3A',
+    teal:    '2A7A5A',
+    orange:  'FB8C3A',
+    red:     'C0392B',
+    blue:    '2979C0',
+    white:   'FFFFFF',
+    bg:      'F4F7F4',
+    text:    '1A2A1A',
+    text2:   '3A5A3A',
+    muted:   '7A9A7A',
+    border:  'D4E0D4',
+  };
+
+  // ────────────────────────────────────────────────────────────
+  // SLIDE 1 — COVER
+  // ────────────────────────────────────────────────────────────
+  const s1 = pres.addSlide();
+  s1.background = { color: C.navy };
+
+  // Accent block kiri
+  s1.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:0.18, h:5.625, fill:{ color: C.green } });
+
+  // Decorative circles
+  s1.addShape(pres.shapes.OVAL, { x:7.8, y:-0.5, w:3.2, h:3.2, fill:{ color: 'FFFFFF', transparency:92 }, line:{ color: C.white, width:0 } });
+  s1.addShape(pres.shapes.OVAL, { x:8.5, y:3.0,  w:2.0, h:2.0, fill:{ color: C.green,  transparency:80 }, line:{ color: C.white, width:0 } });
+
+  // Company tag
+  s1.addText('PT PRASAD SEEDS INDONESIA', {
+    x:0.45, y:0.55, w:7, h:0.38,
+    fontSize:9, bold:true, color:'6FCF6F', fontFace:'Calibri', charSpacing:4,
+  });
+
+  // Dept tag
+  s1.addText('MAINTENANCE & ENGINEERING DEPARTMENT', {
+    x:0.45, y:0.88, w:7, h:0.3,
+    fontSize:8, color:C.muted, fontFace:'Calibri', charSpacing:2,
+  });
+
+  // Main title
+  s1.addText('EXECUTIVE REPORT', {
+    x:0.45, y:1.55, w:8.5, h:0.85,
+    fontSize:44, bold:true, color:C.white, fontFace:'Calibri',
+  });
+  s1.addText('Work Order — Maintenance System', {
+    x:0.45, y:2.32, w:8, h:0.55,
+    fontSize:22, color:'CADCFC', fontFace:'Calibri',
+  });
+
+  // Divider
+  s1.addShape(pres.shapes.RECTANGLE, { x:0.45, y:3.05, w:2.5, h:0.04, fill:{ color: C.green } });
+
+  // Period + Operator
+  s1.addText(`Tahun ${d.year}  ·  Per ${d.nowStr}`, {
+    x:0.45, y:3.25, w:7, h:0.35,
+    fontSize:12, color:'CADCFC', fontFace:'Calibri',
+  });
+  s1.addText(`Dibuat oleh: ${d.operator}`, {
+    x:0.45, y:3.60, w:5, h:0.3,
+    fontSize:10, color:C.muted, fontFace:'Calibri',
+  });
+
+  // Bottom bar
+  s1.addShape(pres.shapes.RECTANGLE, { x:0, y:5.15, w:10, h:0.475, fill:{ color: C.green } });
+  s1.addText('CONFIDENTIAL — INTERNAL USE ONLY', {
+    x:0, y:5.15, w:10, h:0.475,
+    fontSize:9, bold:true, color:C.white, align:'center', valign:'middle', fontFace:'Calibri', charSpacing:3,
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // SLIDE 2 — EXECUTIVE SUMMARY
+  // ────────────────────────────────────────────────────────────
+  const s2 = pres.addSlide();
+  s2.background = { color: C.bg };
+
+  // Header bar
+  s2.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:10, h:0.72, fill:{ color: C.navy } });
+  s2.addText('EXECUTIVE SUMMARY', {
+    x:0.4, y:0, w:7, h:0.72,
+    fontSize:18, bold:true, color:C.white, valign:'middle', fontFace:'Calibri', charSpacing:2,
+  });
+  s2.addText(`Tahun ${d.year}`, {
+    x:7.5, y:0, w:2.1, h:0.72,
+    fontSize:11, color:'CADCFC', valign:'middle', align:'right', fontFace:'Calibri',
+  });
+
+  // KPI cards — row 1 (4 cards)
+  const kpiCards = [
+    { label:'Total WO',         val: String(d.totalAll),   sub:'Work Order dibuat',  col: C.blue,   ico:'📋' },
+    { label:'WO Selesai',       val: String(d.doneAll),    sub:'Status Done',        col: C.green,  ico:'✅' },
+    { label:'Completion Rate',  val: d.rateAll + '%',      sub:'dari total WO',      col: d.rateAll>=70 ? C.green : C.orange, ico:'📈' },
+    { label:'WO Tertunggak',    val: String(d.openAll),    sub:'Open / In Progress', col: d.openAll>5 ? C.red : C.orange, ico:'⚠' },
+  ];
+
+  kpiCards.forEach((k, i) => {
+    const x = 0.3 + i * 2.38;
+    s2.addShape(pres.shapes.RECTANGLE, {
+      x, y:0.88, w:2.18, h:1.42,
+      fill:{ color: C.white },
+      shadow:{ type:'outer', blur:6, offset:2, angle:135, color:'000000', opacity:0.08 },
+    });
+    // Top accent
+    s2.addShape(pres.shapes.RECTANGLE, { x, y:0.88, w:2.18, h:0.055, fill:{ color: k.col } });
+    s2.addText(k.ico, { x: x+0.08, y:0.95, w:0.45, h:0.45, fontSize:18 });
+    s2.addText(k.val, {
+      x, y:1.30, w:2.18, h:0.62,
+      fontSize:32, bold:true, color:k.col, align:'center', fontFace:'Calibri',
+    });
+    s2.addText(k.label, {
+      x, y:1.88, w:2.18, h:0.24,
+      fontSize:9.5, bold:true, color:C.navy, align:'center', fontFace:'Calibri', charSpacing:0.5,
+    });
+    s2.addText(k.sub, {
+      x, y:2.10, w:2.18, h:0.20,
+      fontSize:8, color:C.muted, align:'center', fontFace:'Calibri',
+    });
+  });
+
+  // Row 2 cards — avg hours + high priority
+  const kpi2 = [
+    { label:'Avg Durasi (Done)', val: d.avgHrsAll ? d.avgHrsAll + ' jam' : '—', sub:'rata-rata per WO selesai', col: C.teal, ico:'⏱' },
+    { label:'High / Critical',   val: String(d.highAll),  sub:'WO prioritas tinggi',  col: d.highAll>3 ? C.red : C.orange, ico:'🔴' },
+  ];
+  kpi2.forEach((k, i) => {
+    const x = 0.3 + i * 4.75;
+    s2.addShape(pres.shapes.RECTANGLE, {
+      x, y:2.45, w:4.55, h:1.1,
+      fill:{ color: C.white },
+      shadow:{ type:'outer', blur:5, offset:2, angle:135, color:'000000', opacity:0.07 },
+    });
+    s2.addShape(pres.shapes.RECTANGLE, { x, y:2.45, w:4.55, h:0.05, fill:{ color: k.col } });
+    s2.addText(k.ico + '  ' + k.val, {
+      x, y:2.55, w:4.55, h:0.55,
+      fontSize:26, bold:true, color:k.col, align:'center', fontFace:'Calibri',
+    });
+    s2.addText(k.label + '  ·  ' + k.sub, {
+      x, y:3.08, w:4.55, h:0.22,
+      fontSize:9, color:C.muted, align:'center', fontFace:'Calibri',
+    });
+  });
+
+  // Highlight notes
+  const highlights = [
+    `Total ${d.totalAll} WO masuk sepanjang tahun ${d.year} dari seluruh unit.`,
+    `Completion rate ${d.rateAll}% — ${d.rateAll >= 80 ? '✅ target tercapai' : d.rateAll >= 60 ? '⚠ perlu peningkatan' : '❌ perlu perhatian serius'}.`,
+    `Unit 1: ${d.u1.list.length} WO · ${d.u1.rate}% selesai  |  Unit 2: ${d.u2.list.length} WO · ${d.u2.rate}% selesai.`,
+    `${d.highAll} WO berkategori High/Critical — perlu monitoring ketat.`,
+  ];
+  s2.addShape(pres.shapes.RECTANGLE, { x:0.3, y:3.75, w:9.4, h:1.6, fill:{ color: C.navy, transparency:6 } });
+  s2.addText('Key Highlights', { x:0.5, y:3.82, w:4, h:0.3, fontSize:9.5, bold:true, color: C.green, fontFace:'Calibri', charSpacing:1 });
+  s2.addText(highlights.map((t,i) => ({ text: t, options:{ bullet:true, breakLine: i<highlights.length-1, fontSize:9.5, color:C.text, fontFace:'Calibri' } })),
+    { x:0.5, y:4.10, w:9.1, h:1.1 });
+
+  // Footer
+  s2.addText(`PT Prasad Seeds Indonesia  ·  Maintenance & Engineering  ·  ${d.nowStr}`, {
+    x:0, y:5.35, w:10, h:0.27, fontSize:7.5, color:C.muted, align:'center', fontFace:'Calibri',
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // SLIDE 3 — GRAFIK WO MASUK VS SELESAI
+  // ────────────────────────────────────────────────────────────
+  const s3 = pres.addSlide();
+  s3.background = { color: C.bg };
+
+  s3.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:10, h:0.72, fill:{ color: C.navy } });
+  s3.addText('GRAFIK PENYELESAIAN WORK ORDER', {
+    x:0.4, y:0, w:7.5, h:0.72,
+    fontSize:17, bold:true, color:C.white, valign:'middle', fontFace:'Calibri', charSpacing:2,
+  });
+  s3.addText(`Trend Bulanan ${d.year}`, {
+    x:7.3, y:0, w:2.3, h:0.72,
+    fontSize:10, color:'CADCFC', valign:'middle', align:'right', fontFace:'Calibri',
+  });
+
+  // Combo chart: grouped bar (masuk+selesai) + line completion rate
+  const masukVals   = d.monthlyData.map(m => m.masuk);
+  const selesaiVals = d.monthlyData.map(m => m.selesai);
+  const rateVals    = d.monthlyData.map(m => m.masuk ? Math.round(m.selesai/m.masuk*100) : 0);
+  const labels      = d.MONTHS;
+
+  s3.addChart(
+    [
+      { type: pres.charts.BAR,  data: [{ name:'WO Masuk',   labels, values: masukVals }],   options:{ chartColors:[ C.blue ],  barDir:'col', barGrouping:'clustered' } },
+      { type: pres.charts.BAR,  data: [{ name:'WO Selesai', labels, values: selesaiVals }],  options:{ chartColors:[ C.green ], barDir:'col', barGrouping:'clustered' } },
+      { type: pres.charts.LINE, data: [{ name:'Rate (%)',   labels, values: rateVals }],     options:{ chartColors:[ C.orange ], lineSize:2.5, lineSmooth:true, secondaryValAxis:true, secondaryCatAxis:true } },
+    ],
+    {
+      x:0.4, y:0.88, w:9.2, h:3.6,
+      chartArea:{ fill:{ color: C.white }, roundedCorners:true },
+      catAxisLabelColor: C.muted,
+      valAxisLabelColor: C.muted,
+      valGridLine:{ color:'E2E8F0', size:0.5 },
+      catGridLine:{ style:'none' },
+      showLegend:true, legendPos:'b',
+      showTitle:false,
+      valAxes:[
+        { showValAxisTitle:true, valAxisTitle:'Jumlah WO',       valAxisTitleColor: C.text2 },
+        { showValAxisTitle:true, valAxisTitle:'Completion Rate (%)', valAxisTitleColor: C.orange },
+      ],
+      catAxes:[{ catAxisTitle:'' },{ catAxisHidden:true }],
+    }
+  );
+
+  // Summary strip bawah chart
+  const totalMasuk = d.monthlyData.reduce((s,m)=>s+m.masuk,0);
+  const totalSel   = d.monthlyData.reduce((s,m)=>s+m.selesai,0);
+  const peakMonth  = d.monthlyData.reduce((best,m) => m.masuk > best.masuk ? m : best, d.monthlyData[0]);
+  const stripItems = [
+    ['📥 Total Masuk', String(totalMasuk)],
+    ['✅ Total Selesai', String(totalSel)],
+    ['📈 Rate Tahunan', totalMasuk ? Math.round(totalSel/totalMasuk*100)+'%' : '—'],
+    ['🔺 Bulan Tertinggi', peakMonth.label + ' (' + peakMonth.masuk + ')'],
+  ];
+  stripItems.forEach(([lbl, val], i) => {
+    const x = 0.4 + i * 2.32;
+    s3.addShape(pres.shapes.RECTANGLE, { x, y:4.62, w:2.18, h:0.78, fill:{ color: C.navy } });
+    s3.addText(val, { x, y:4.66, w:2.18, h:0.38, fontSize:18, bold:true, color:C.green, align:'center', fontFace:'Calibri' });
+    s3.addText(lbl, { x, y:5.02, w:2.18, h:0.24, fontSize:8,  color:'CADCFC',   align:'center', fontFace:'Calibri' });
+  });
+
+  s3.addText(`PT Prasad Seeds Indonesia  ·  ${d.nowStr}`, {
+    x:0, y:5.38, w:10, h:0.24, fontSize:7, color:C.muted, align:'center', fontFace:'Calibri',
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // SLIDE 4 — SUMMARY UNIT 1
+  // ────────────────────────────────────────────────────────────
+  function buildUnitSlide(pres, unitData, unitLabel, accentColor) {
+    const sl = pres.addSlide();
+    sl.background = { color: C.bg };
+
+    // Header
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:10, h:0.72, fill:{ color: C.navy } });
+    sl.addShape(pres.shapes.RECTANGLE, { x:0, y:0, w:0.28, h:0.72, fill:{ color: accentColor } });
+    sl.addText('SUMMARY ' + unitLabel.toUpperCase(), {
+      x:0.45, y:0, w:7, h:0.72,
+      fontSize:17, bold:true, color:C.white, valign:'middle', fontFace:'Calibri', charSpacing:2,
+    });
+    sl.addText(unitData.name, {
+      x:6.5, y:0, w:3.1, h:0.72,
+      fontSize:10, color:'CADCFC', valign:'middle', align:'right', fontFace:'Calibri',
+    });
+
+    // KPI row
+    const uKpi = [
+      { label:'Total WO',        val: String(unitData.list.length), col: C.blue  },
+      { label:'Selesai',         val: String(unitData.done),         col: C.green },
+      { label:'Rate',            val: unitData.rate + '%',           col: unitData.rate>=70 ? C.green : C.orange },
+      { label:'Open/In Prog',    val: String(unitData.open),         col: unitData.open>5 ? C.red : C.orange },
+      { label:'High Priority',   val: String(unitData.high),         col: unitData.high>2 ? C.red : C.teal },
+    ];
+    uKpi.forEach((k, i) => {
+      const x = 0.28 + i * 1.9;
+      sl.addShape(pres.shapes.RECTANGLE, {
+        x, y:0.85, w:1.78, h:1.18,
+        fill:{ color: C.white },
+        shadow:{ type:'outer', blur:5, offset:2, angle:135, color:'000000', opacity:0.08 },
+      });
+      sl.addShape(pres.shapes.RECTANGLE, { x, y:0.85, w:1.78, h:0.05, fill:{ color: k.col } });
+      sl.addText(k.val, {
+        x, y:0.95, w:1.78, h:0.6,
+        fontSize:28, bold:true, color:k.col, align:'center', fontFace:'Calibri',
+      });
+      sl.addText(k.label, {
+        x, y:1.55, w:1.78, h:0.24,
+        fontSize:8.5, color:C.navy, align:'center', fontFace:'Calibri',
+      });
+    });
+
+    // Left: Pie chart (type distribution)
+    sl.addChart(pres.charts.DOUGHNUT, [{
+      name: 'Tipe WO', labels: ['Troubleshooting','Improvement'],
+      values: [ unitData.troubleshoot, unitData.improvement ],
+    }], {
+      x:0.3, y:2.18, w:3.5, h:2.85,
+      chartColors:[ C.orange, C.blue ],
+      chartArea:{ fill:{ color: C.white }, roundedCorners:true },
+      showLegend:true, legendPos:'b',
+      showLabel:true, showPercent:true,
+      dataLabelColor:C.white, dataLabelFontSize:10,
+      holeSize:48,
+      showTitle:true, title:'Distribusi Tipe WO', titleFontSize:10, titleColor:C.navy,
+    });
+
+    // Right: Bar chart top equipment atau area
+    const topEqLabels = unitData.topEquip.length ? unitData.topEquip.map(([n]) => n.length>14 ? n.slice(0,14)+'…' : n) : ['—'];
+    const topEqVals   = unitData.topEquip.length ? unitData.topEquip.map(([,v]) => v) : [0];
+
+    sl.addChart(pres.charts.BAR, [{
+      name:'Jumlah WO', labels: topEqLabels, values: topEqVals,
+    }], {
+      x:3.95, y:2.18, w:5.75, h:2.85,
+      barDir:'bar',
+      chartColors:[ accentColor ],
+      chartArea:{ fill:{ color: C.white }, roundedCorners:true },
+      catAxisLabelColor: C.muted,
+      valAxisLabelColor: C.muted,
+      valGridLine:{ color:'E2E8F0', size:0.5 },
+      catGridLine:{ style:'none' },
+      showValue:true, dataLabelColor:C.white, dataLabelFontSize:9,
+      showLegend:false,
+      showTitle:true, title:'Top Equipment Bermasalah', titleFontSize:10, titleColor:C.navy,
+    });
+
+    // Footer
+    sl.addText(`PT Prasad Seeds Indonesia  ·  Maintenance & Engineering  ·  ${d.nowStr}`, {
+      x:0, y:5.38, w:10, h:0.24, fontSize:7, color:C.muted, align:'center', fontFace:'Calibri',
+    });
+
+    return sl;
+  }
+
+  buildUnitSlide(pres, d.u1, 'Unit 1', C.green);
+  buildUnitSlide(pres, d.u2, 'Unit 2', C.blue);
+
+  // ── Trigger download ──
+  const fileName = `WO_Executive_Report_${d.year}_${d.nowStr.replace(/\s/g,'_')}.pptx`;
+  await pres.writeFile({ fileName });
+}
 // ═══════════════════════════════════════════════════════════════
 
 function renderUserManagement() {
@@ -6151,8 +6803,19 @@ async function exportComparisonPDF() {
 
 if (checkSession()) {
   document.getElementById('login-screen').style.display = 'none';
-  applyRoleUI();
-  init();
+  if (needsUnitSelector(SESSION.role) && !SESSION.selectedUnit) {
+    showUnitSelector();
+  } else {
+    if (SESSION.selectedUnit) {
+      if (SESSION.role !== 'Admin' && SESSION.role !== 'SPV') {
+        applySimpleMode();
+      } else {
+        addUnitPill(SESSION.selectedUnitName || '');
+      }
+    }
+    applyRoleUI();
+    init();
+  }
   // Wire print modal filter changes → update count
   ['print-date-from','print-date-to','print-filter-status','print-filter-priority'].forEach(id => {
     const el = document.getElementById(id);
