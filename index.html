@@ -1826,7 +1826,7 @@ _Terima kasih. WO telah ditutup._</div>
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
-  apiUrl:     'https://script.google.com/macros/s/AKfycbxWC3esNUKacXKDx1cGqzrtaaH0vKW4pbsVV6_zmUj5jSXBTP2aZLJ73X6M9vW9W3ro/exec',
+  apiUrl:     'https://script.google.com/macros/s/AKfycbz9qqnGhDVNYN_GtiF0ng-nxKNjiuh-NiQFieMFP4B8H_PAvZ7KZfGjcDleCE84vRy3/exec',
   equipDbApi: 'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
   storageKey: 'wo_data_v1',
   equipDbKey: 'edb_data',
@@ -3603,14 +3603,16 @@ function changeQty(delta) {
 async function confirmPickPart() {
   const woId = document.getElementById('pp-wo-id').value;
   if (!PP_SELECTED.partId) { toast('Pilih part dulu', 'error'); return; }
-  const wo  = WO.workorders.find(w => w.id === woId);
+  const wo = WO.workorders.find(w => w.id === woId);
   if (!wo) return;
   const qty = parseInt(document.getElementById('pp-qty-inp')?.value) || PP_SELECTED.qty;
 
-  // Cek stok dari ITEMS_DB_CACHE
+  // Cek stok dari cache
   const rawItem   = ITEMS_DB_CACHE.find(i => (i.itemCode || i.id) === PP_SELECTED.partId);
-  const localPart = rawItem ? itemToPickerPart(rawItem) : (EQUIP_DB.parts || []).find(p => p.id === PP_SELECTED.partId);
-  const curStock  = parseInt(localPart?.stock ?? 0);
+  const localPart = rawItem
+    ? itemToPickerPart(rawItem)
+    : (EQUIP_DB.parts || []).find(p => p.id === PP_SELECTED.partId);
+  const curStock = parseInt(localPart?.stock ?? 0);
 
   if (curStock < qty) {
     toast(`Stok tidak cukup! Stok saat ini: ${curStock} ${localPart?.uom || 'pcs'}`, 'error');
@@ -3620,43 +3622,46 @@ async function confirmPickPart() {
   const btn = event?.target;
   if (btn) btn.disabled = true;
 
-  // ── Kurangi stok ITEMS_DB di GAS (blocking — harus sukses dulu) ──
+  // ── Update stok ITEMS_DB via GET (lebih reliable di GAS CORS) ──
   try {
-    const resp = await fetch(CFG.apiUrl, {
-      method: 'POST', mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action:   'updateStock',
-        itemCode: PP_SELECTED.partId,
-        txType:   'OUT',
-        quantity: qty,
-        pic:      SESSION?.nama || 'WO System',
-        notes:    'WO: ' + woId,
-        woId:     woId,
-      }),
+    const stockBody = {
+      action:   'updateStock',
+      itemCode: PP_SELECTED.partId,
+      txType:   'OUT',
+      quantity: qty,
+      pic:      SESSION?.nama || 'WO System',
+      notes:    'WO: ' + woId,
+      woId:     woId,
+    };
+
+    const url = CFG.apiUrl
+      + '?action=updateStock&_body='
+      + encodeURIComponent(JSON.stringify(stockBody));
+
+    const resp   = await fetch(url, {
+      method: 'GET',
+      mode:   'cors',
+      signal: AbortSignal.timeout(20000),
     });
     const result = await resp.json();
+
     if (!result.success) {
       toast('❌ GAS error: ' + (result.message || 'Gagal update stok'), 'error');
       if (btn) btn.disabled = false;
       return;
     }
-    // Update cache lokal dengan nilai stockAfter dari GAS (lebih akurat dari optimistic)
-    if (rawItem) {
-      rawItem.stock = String(result.stockAfter ?? Math.max(0, curStock - qty));
-      saveItemsDbCache(ITEMS_DB_CACHE);
-    } else if (localPart) {
-      localPart.stock = String(result.stockAfter ?? Math.max(0, curStock - qty));
-    }
-  } catch(e) {
-    console.warn('[PartsPicker] Gagal update stok ITEMS_DB:', e.message);
-    // Tetap lanjut tapi update cache secara optimistic
-    if (rawItem) {
-      rawItem.stock = String(Math.max(0, curStock - qty));
-      saveItemsDbCache(ITEMS_DB_CACHE);
-    } else if (localPart) {
-      localPart.stock = String(Math.max(0, curStock - qty));
-    }
+
+    // Update cache lokal pakai stockAfter dari GAS
+    const newStock = String(result.stockAfter ?? Math.max(0, curStock - qty));
+    if (rawItem)   { rawItem.stock   = newStock; saveItemsDbCache(ITEMS_DB_CACHE); }
+    if (localPart) { localPart.stock = newStock; }
+
+  } catch (e) {
+    console.warn('[PartsPicker] Gagal update stok:', e.message);
+    // Optimistic update jika GAS tidak bisa dicapai
+    const fallback = String(Math.max(0, curStock - qty));
+    if (rawItem)   { rawItem.stock   = fallback; saveItemsDbCache(ITEMS_DB_CACHE); }
+    if (localPart) { localPart.stock = fallback; }
   }
 
   // ── Tambah ke partsUsed WO ──
@@ -3671,7 +3676,12 @@ async function confirmPickPart() {
   closeModal('parts-picker');
   showDetail(woId);
   toast(`${PP_SELECTED.name} ×${qty} ditambahkan ke WO`, 'success');
+
+  // Sync WO ke Sheets — force flush langsung, jangan tunggu debounce
   syncUpsertWO(wo);
+  if (SYNC.timer) { clearTimeout(SYNC.timer); SYNC.timer = null; }
+  setTimeout(() => flushQueue(), 200);
+
   if (btn) btn.disabled = false;
 }
 
@@ -4066,7 +4076,8 @@ function woToRow(wo) {
     checklist:      checklistItems,
     checklistDone:  (wo.checklist  || []).filter(c => c.done).length,
     checklistTotal: (wo.checklist  || []).length,
-    partsUsed:      (wo.partsUsed  || []).map(p => `${p.name} x${p.qty}`).join(', '),
+    partsUsed:      JSON.stringify(wo.partsUsed || []),
+    partsUsedText:  (wo.partsUsed  || []).map(p => `${p.name} x${p.qty}`).join(', '),
     partsCount:     (wo.partsUsed  || []).length,
     notesLog:       notesLogSummary,
     attachments:    attachList,
