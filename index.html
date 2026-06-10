@@ -1181,7 +1181,12 @@ _Terima kasih. WO telah ditutup._</div>
       <div class="sec-sub">Perbandingan Work Order Masuk vs Selesai per bulan</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <select class="fsel" id="cmp-year" onchange="renderComparison()" style="min-width:90px">
+      <select class="fsel" id="cmp-unit" onchange="renderComparison()" style="min-width:110px">
+  <option value="all">Semua Unit</option>
+  <option value="U-001">Unit 1</option>
+  <option value="U-002">Unit 2</option>
+</select>
+<select class="fsel" id="cmp-year" onchange="renderComparison()" style="min-width:90px">
       </select>
       <select class="fsel" id="cmp-view" onchange="onCmpViewChange()" style="min-width:120px">
         <option value="monthly">Per Bulan</option>
@@ -3500,13 +3505,11 @@ function saveItemsDbCache(items) {
 // Map item dari ITEMS_DB ke format parts picker
 function itemToPickerPart(item) {
   return {
-    id:       item.itemCode || item.id || '',
-    name:     item.itemName || '',
-    stock:    parseInt(item.stock)         || 0,
-    minStock: 0,
-    uom:      item.unit                    || 'pcs',
-    dept:     item.department              || '',
-    area:     item.area                    || '',
+    id:       item.itemCode || item.id   || '',
+    name:     item.itemName || item.name || '',
+    stock:    parseInt(item.stock)       || 0,
+    minStock: parseInt(item.minStock)    || 0,
+    uom:      item.uom      || item.unit || 'pcs',
   };
 }
 
@@ -3572,11 +3575,10 @@ function renderPartsPicker() {
     const s   = p.stock;
     const cls = s === 0 ? 'zero' : (s <= (p.minStock || 0) ? 'low' : 'ok');
     const isSel = PP_SELECTED.partId === p.id;
-    const deptArea = [p.dept, p.area].filter(Boolean).join(' · ');
     return `<div class="pp-item ${isSel ? 'selected' : ''}" onclick="selectPart('${p.id}','${esc(p.name)}')">
       <div class="pp-info">
         <div class="pp-name">${esc(p.name)}</div>
-        <div class="pp-code">${esc(p.id)}${deptArea ? ' · <span style="color:var(--text3)">' + esc(deptArea) + '</span>' : ''} · Stok: <span class="pp-stock ${cls}">${s} ${p.uom}</span></div>
+        <div class="pp-code">${esc(p.id)} · Stok: <span class="pp-stock ${cls}">${s} ${p.uom}</span></div>
       </div>
       ${isSel ? `<div class="pp-qty-wrap" onclick="event.stopPropagation()">
         <button class="qty-btn" onclick="changeQty(-1)">−</button>
@@ -3608,7 +3610,7 @@ async function confirmPickPart() {
   // Cek stok dari ITEMS_DB_CACHE
   const rawItem   = ITEMS_DB_CACHE.find(i => (i.itemCode || i.id) === PP_SELECTED.partId);
   const localPart = rawItem ? itemToPickerPart(rawItem) : (EQUIP_DB.parts || []).find(p => p.id === PP_SELECTED.partId);
-  const curStock  = parseInt(localPart?.stock || 0);
+  const curStock  = parseInt(localPart?.stock ?? 0);
 
   if (curStock < qty) {
     toast(`Stok tidak cukup! Stok saat ini: ${curStock} ${localPart?.uom || 'pcs'}`, 'error');
@@ -3618,28 +3620,9 @@ async function confirmPickPart() {
   const btn = event?.target;
   if (btn) btn.disabled = true;
 
-  wo.partsUsed.push({
-    partId: PP_SELECTED.partId,
-    name:   PP_SELECTED.name,
-    qty,
-    uom:    localPart?.uom || 'pcs',
-  });
-  addAudit(wo, 'parts', `Part diambil: ${PP_SELECTED.name} ×${qty}`);
-  saveLocal(); closeModal('parts-picker'); showDetail(woId);
-  toast(PP_SELECTED.name + ' ×' + qty + ' ditambahkan ke WO', 'success');
-  syncUpsertWO(wo);
-
-  // Update stok cache lokal (optimistic)
-  if (rawItem) {
-    rawItem.stock = String(Math.max(0, curStock - qty));
-    saveItemsDbCache(ITEMS_DB_CACHE);
-  } else if (localPart) {
-    localPart.stock = String(Math.max(0, curStock - qty));
-  }
-
-  // Kurangi stok ITEMS_DB di GAS (background, non-blocking)
+  // ── Kurangi stok ITEMS_DB di GAS (blocking — harus sukses dulu) ──
   try {
-    await fetch(CFG.apiUrl + '?action=updateStock', {
+    const resp = await fetch(CFG.apiUrl, {
       method: 'POST', mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3648,12 +3631,48 @@ async function confirmPickPart() {
         txType:   'OUT',
         quantity: qty,
         pic:      SESSION?.nama || 'WO System',
-        notes:    'WO: ' + woId + ' — ' + wo.title,
+        notes:    'WO: ' + woId,
+        woId:     woId,
       }),
     });
+    const result = await resp.json();
+    if (!result.success) {
+      toast('❌ GAS error: ' + (result.message || 'Gagal update stok'), 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    // Update cache lokal dengan nilai stockAfter dari GAS (lebih akurat dari optimistic)
+    if (rawItem) {
+      rawItem.stock = String(result.stockAfter ?? Math.max(0, curStock - qty));
+      saveItemsDbCache(ITEMS_DB_CACHE);
+    } else if (localPart) {
+      localPart.stock = String(result.stockAfter ?? Math.max(0, curStock - qty));
+    }
   } catch(e) {
     console.warn('[PartsPicker] Gagal update stok ITEMS_DB:', e.message);
+    // Tetap lanjut tapi update cache secara optimistic
+    if (rawItem) {
+      rawItem.stock = String(Math.max(0, curStock - qty));
+      saveItemsDbCache(ITEMS_DB_CACHE);
+    } else if (localPart) {
+      localPart.stock = String(Math.max(0, curStock - qty));
+    }
   }
+
+  // ── Tambah ke partsUsed WO ──
+  wo.partsUsed.push({
+    partId: PP_SELECTED.partId,
+    name:   PP_SELECTED.name,
+    qty,
+    uom:    localPart?.uom || 'pcs',
+  });
+  addAudit(wo, 'parts', `Part diambil: ${PP_SELECTED.name} ×${qty}`);
+  saveLocal();
+  closeModal('parts-picker');
+  showDetail(woId);
+  toast(`${PP_SELECTED.name} ×${qty} ditambahkan ke WO`, 'success');
+  syncUpsertWO(wo);
+  if (btn) btn.disabled = false;
 }
 
 function removePart(woId, partId) {
@@ -6106,7 +6125,10 @@ function getComparisonData() {
   const year    = parseInt(document.getElementById('cmp-year')?.value) || new Date().getFullYear();
   const view    = document.getElementById('cmp-view')?.value || 'monthly';
   const MONTHS  = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-  const all     = WO.workorders;
+  const selectedUnit = document.getElementById('cmp-unit')?.value || 'all';
+const all = selectedUnit === 'all'
+  ? WO.workorders
+  : WO.workorders.filter(w => w.unitId === selectedUnit);
 
   if (view === 'monthly') {
     const periods = MONTHS.map((label, idx) => {
@@ -6265,7 +6287,12 @@ function renderComparison() {
   const totalMasuk  = periods.reduce((s,p) => s+p.masuk,   0);
   const totalDone   = periods.reduce((s,p) => s+p.selesai, 0);
   const rate        = totalMasuk ? Math.round(totalDone / totalMasuk * 100) : 0;
-  const backlog     = WO.workorders.filter(w =>
+  const selectedUnit = document.getElementById('cmp-unit')?.value || 'all';
+const filteredWO = selectedUnit === 'all'
+  ? WO.workorders
+  : WO.workorders.filter(w => w.unitId === selectedUnit);
+
+const backlog = filteredWO.filter(w =>
     (w.status === 'Open' || w.status === 'In Progress') &&
     new Date(w.createdAt).getFullYear() <= year
   ).length;
