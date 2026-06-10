@@ -3674,8 +3674,9 @@ async function confirmPickPart() {
   addAudit(wo, 'parts', `Part diambil: ${PP_SELECTED.name} ×${qty}`);
   saveLocal();
   closeModal('parts-picker');
-  showDetail(woId);
-  toast(`${PP_SELECTED.name} ×${qty} ditambahkan ke WO`, 'success');
+showDetail(woId);
+setTimeout(() => switchTab('parts', woId), 100);
+toast(`${PP_SELECTED.name} ×${qty} ditambahkan ke WO`, 'success');
 
   // Sync WO ke Sheets — force flush langsung, jangan tunggu debounce
   syncUpsertWO(wo);
@@ -4005,11 +4006,22 @@ async function syncAllToSheets() {
 function normalizeWOFromSheets(w) {
   if (!w) return w;
   function tryParseArr(val) {
-    if (Array.isArray(val)) return val;
-    if (!val || val === '') return [];
-    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch {}
-    return [];
-  }
+  if (Array.isArray(val)) return val;
+  if (!val || val === '') return [];
+  const s = String(val).trim();
+  if (!s) return [];
+  // Format JSON array baru: [{"partId":"...","name":"...","qty":1}]
+  try {
+    const p = JSON.parse(s);
+    return Array.isArray(p) ? p : [];
+  } catch {}
+  // Fallback format lama: "Bearing x2, Oil Filter x1"
+  return s.split(',').map(item => {
+    const m = item.trim().match(/^(.+?)\s+x(\d+)$/i);
+    if (!m) return null;
+    return { partId: '', name: m[1].trim(), qty: parseInt(m[2]) || 1, uom: 'pcs' };
+  }).filter(Boolean);
+}
   // Trim helper — hapus whitespace tersembunyi dari Sheets
   function t(val) { return (val || '').toString().trim(); }
   return {
@@ -4077,7 +4089,6 @@ function woToRow(wo) {
     checklistDone:  (wo.checklist  || []).filter(c => c.done).length,
     checklistTotal: (wo.checklist  || []).length,
     partsUsed:      JSON.stringify(wo.partsUsed || []),
-    partsUsedText:  (wo.partsUsed  || []).map(p => `${p.name} x${p.qty}`).join(', '),
     partsCount:     (wo.partsUsed  || []).length,
     notesLog:       notesLogSummary,
     attachments:    attachList,
