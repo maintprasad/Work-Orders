@@ -6,9 +6,7 @@
 <title>Prasad Seeds — Work Order System</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-/* ══════════════════════════════════════════
-   WORK ORDER SYSTEM — Daily Report Style
-   ══════════════════════════════════════════ */
+
 :root{
   --bg:#f4f7f4;--bg2:#ffffff;--bg3:#eef3ee;--border:#d4e0d4;
   --navy:#1a3a6b;--green:#4a9e3f;--green2:#3a8a30;--green-light:#e8f5e8;
@@ -1194,18 +1192,18 @@ _Terima kasih. WO telah ditutup._</div>
         <option value="weekly-month">Per Minggu dalam Bulan</option>
       </select>
       <select class="fsel" id="cmp-month-filter" onchange="renderComparison()" style="min-width:110px;display:none">
-        <option value="0">Januari</option>
-        <option value="1">Februari</option>
-        <option value="2">Maret</option>
+        <option value="0">January</option>
+        <option value="1">February</option>
+        <option value="2">March</option>
         <option value="3">April</option>
-        <option value="4">Mei</option>
-        <option value="5">Juni</option>
-        <option value="6">Juli</option>
-        <option value="7">Agustus</option>
+        <option value="4">May</option>
+        <option value="5">June</option>
+        <option value="6">July</option>
+        <option value="7">August</option>
         <option value="8">September</option>
-        <option value="9">Oktober</option>
+        <option value="9">October</option>
         <option value="10">November</option>
-        <option value="11">Desember</option>
+        <option value="11">December</option>
       </select>
       <button class="btn-ghost" onclick="exportComparisonPDF()" title="Export PDF">📄 PDF</button>
       <button class="btn-ghost" onclick="renderComparison()">↻ Refresh</button>
@@ -1230,7 +1228,7 @@ _Terima kasih. WO telah ditutup._</div>
       <div class="stat-sub">sepanjang tahun</div>
     </div>
     <div class="stat-card c-teal">
-      <div class="stat-lbl">WO Tertunggak</div>
+      <div class="stat-lbl">WO Tertunda</div>
       <div class="stat-val" id="cmp-backlog">—</div>
       <div class="stat-sub">WO masuk belum diselesaikan</div>
     </div>
@@ -1256,13 +1254,13 @@ _Terima kasih. WO telah ditutup._</div>
     <table class="data-table" id="cmp-table">
       <thead>
         <tr>
-          <th>Periode</th>
-          <th>WO Masuk</th>
-          <th>WO Selesai</th>
+          <th>Period</th>
+          <th>WO</th>
+          <th>WO Done</th>
           <th>Completion Rate</th>
-          <th>Tertunggak</th>
+          <th>Postpone</th>
           <th>High Priority</th>
-          <th>Avg Durasi</th>
+          <th>Avg Duration</th>
         </tr>
       </thead>
       <tbody id="cmp-tbody"></tbody>
@@ -1285,7 +1283,7 @@ _Terima kasih. WO telah ditutup._</div>
 <button class="mnav-btn" onclick="navigateTo('comparison')"><span class="mnav-ico">📊</span>Comparison</button>
     <button class="mnav-btn" onclick="openModal('wo',null)"><span class="mnav-ico">＋</span>Submit WO</button>
     <button class="mnav-btn" id="mnav-admin" style="display:none" onclick="navigateTo('user-management')"><span class="mnav-ico">⚙</span>Admin</button>
-    <button class="mnav-btn" onclick="doLogout()"><span class="mnav-ico">⏻</span>Keluar</button>
+    <button class="mnav-btn" onclick="doLogout()"><span class="mnav-ico">⏻</span>Logout</button>
   </div>
 </nav>
 
@@ -4925,7 +4923,7 @@ async function buildAndDownloadPPT(d) {
     { label:'Total WO',         val: String(d.totalAll),   sub:'Work Order dibuat',  col: C.blue,   ico:'📋' },
     { label:'WO Selesai',       val: String(d.doneAll),    sub:'Status Done',        col: C.green,  ico:'✅' },
     { label:'Completion Rate',  val: d.rateAll + '%',      sub:'dari total WO',      col: d.rateAll>=70 ? C.green : C.orange, ico:'📈' },
-    { label:'WO Tertunggak',    val: String(d.openAll),    sub:'Open / In Progress', col: d.openAll>5 ? C.red : C.orange, ico:'⚠' },
+    { label:'WO Tertunda',    val: String(d.openAll),    sub:'Open / In Progress', col: d.openAll>5 ? C.red : C.orange, ico:'⚠' },
   ];
 
   kpiCards.forEach((k, i) => {
@@ -6459,7 +6457,7 @@ function _buildChart(canvas, periods) {
           order: 2,
         },
         {
-          label: 'WO Tertunggak (Kumulatif)',
+          label: 'WO Tertunda (Kumulatif)',
           data: backlogData,
           type: 'line',
           borderColor: '#fb8c3a',
@@ -6817,7 +6815,7 @@ async function exportComparisonPDF() {
     <div class="kpi-card"><div class="kpi-val">${totalMasuk}</div><div class="kpi-lbl">Total WO Masuk</div></div>
     <div class="kpi-card"><div class="kpi-val">${totalDone}</div><div class="kpi-lbl">Total Selesai</div></div>
     <div class="kpi-card"><div class="kpi-val" style="color:${crColor(rate)}">${rate}%</div><div class="kpi-lbl">Completion Rate</div></div>
-    <div class="kpi-card"><div class="kpi-val" style="color:${backlogFinal>0?'#c07020':'#3a8a30'}">${backlogFinal}</div><div class="kpi-lbl">WO Tertunggak</div></div>
+    <div class="kpi-card"><div class="kpi-val" style="color:${backlogFinal>0?'#c07020':'#3a8a30'}">${backlogFinal}</div><div class="kpi-lbl">WO Tertunda</div></div>
   </div>
 
   ${chartImgTag ? `<div class="section-title">Grafik Perbandingan</div>${chartImgTag}` : ''}
@@ -6826,7 +6824,7 @@ async function exportComparisonPDF() {
   <table>
     <thead><tr>
       <th>Periode</th><th>WO Masuk</th><th>WO Selesai</th>
-      <th>Completion Rate</th><th>Tertunggak</th><th>High Priority</th><th>Avg Durasi</th>
+      <th>Completion Rate</th><th>Tertunda</th><th>High Priority</th><th>Avg Durasi</th>
     </tr></thead>
     <tbody>${tableRows}</tbody>
   </table>
