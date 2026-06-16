@@ -147,6 +147,7 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
 .b-cancelled{background:rgba(192,57,43,.1);color:var(--red);border-color:rgba(192,57,43,.2)}
 .b-troubleshooting{background:rgba(251,140,58,.1);color:#d4600a;border-color:rgba(251,140,58,.25)}
 .b-improvement{background:rgba(74,158,63,.1);color:var(--green2);border-color:rgba(74,158,63,.2)}
+.b-fabrication{background:rgba(233,30,140,.1);color:#c0177a;border-color:rgba(233,30,140,.25)}
 .b-other{background:rgba(122,154,122,.1);color:var(--text3)}
 .b-low-p{background:rgba(136,145,168,.1);color:var(--text2);border-color:rgba(136,145,168,.15)}
 .b-medium-p{background:rgba(251,140,58,.1);color:#c07020;border-color:rgba(251,140,58,.2)}
@@ -904,6 +905,7 @@ input:checked + .slider:before{transform:translateX(18px)}
       <option value="">Semua Tipe</option>
       <option>Troubleshooting</option>
       <option>Improvement</option>
+      <option>Fabrication/Modification</option>
     </select>
   </div>
 
@@ -1193,17 +1195,17 @@ _Terima kasih. WO telah ditutup._</div>
       </select>
       <select class="fsel" id="cmp-month-filter" onchange="renderComparison()" style="min-width:110px;display:none">
         <option value="0">January</option>
-        <option value="1">February</option>
-        <option value="2">March</option>
+        <option value="1">Februari</option>
+        <option value="2">Maret</option>
         <option value="3">April</option>
-        <option value="4">May</option>
-        <option value="5">June</option>
-        <option value="6">July</option>
-        <option value="7">August</option>
+        <option value="4">Mei</option>
+        <option value="5">Juni</option>
+        <option value="6">Juli</option>
+        <option value="7">Agustus</option>
         <option value="8">September</option>
-        <option value="9">October</option>
+        <option value="9">Oktober</option>
         <option value="10">November</option>
-        <option value="11">December</option>
+        <option value="11">Desember</option>
       </select>
       <button class="btn-ghost" onclick="exportComparisonPDF()" title="Export PDF">📄 PDF</button>
       <button class="btn-ghost" onclick="renderComparison()">↻ Refresh</button>
@@ -1406,6 +1408,7 @@ _Terima kasih. WO telah ditutup._</div>
           <select class="fsel2" id="wo-type">
             <option>Troubleshooting</option>
             <option>Improvement</option>
+            <option>Fabrication/Modification</option>
           </select>
         </div>
         <div class="fg">
@@ -1676,12 +1679,8 @@ _Terima kasih. WO telah ditutup._</div>
           <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">⏱ Waktu Mulai Pengerjaan</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="fg">
-              <label class="flabel">Hari Mulai</label>
-              <select class="fsel2" id="note-start-day">
-                <option value="">— Pilih Hari —</option>
-                <option>Senin</option><option>Selasa</option><option>Rabu</option>
-                <option>Kamis</option><option>Jumat</option><option>Sabtu</option><option>Minggu</option>
-              </select>
+              <label class="flabel">Tanggal Mulai</label>
+              <input class="finput" id="note-start-day" type="date"/>
             </div>
             <div class="fg">
               <label class="flabel">Jam Mulai</label>
@@ -1694,12 +1693,8 @@ _Terima kasih. WO telah ditutup._</div>
           <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px">✅ Waktu Selesai Pengerjaan</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="fg">
-              <label class="flabel">Hari Selesai</label>
-              <select class="fsel2" id="note-end-day">
-                <option value="">— Pilih Hari —</option>
-                <option>Senin</option><option>Selasa</option><option>Rabu</option>
-                <option>Kamis</option><option>Jumat</option><option>Sabtu</option><option>Minggu</option>
-              </select>
+              <label class="flabel">Tanggal Selesai</label>
+              <input class="finput" id="note-end-day" type="date"/>
             </div>
             <div class="fg">
               <label class="flabel">Jam Selesai</label>
@@ -1717,12 +1712,9 @@ _Terima kasih. WO telah ditutup._</div>
         </div>
         <!-- Teknisi yang menangani -->
         <div style="margin-bottom:12px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;border-left:3px solid var(--accent)">
-          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--accent);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px">👷 Teknisi yang Menangani</div>
-          <div class="fg">
-            <select class="fsel2" id="note-tech-id">
-              <option value="">— Pilih Teknisi —</option>
-            </select>
-          </div>
+          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--accent);letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px">👷 Teknisi yang Menangani</div>
+          <div id="note-tech-checkboxes" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto"></div>
+          <input type="hidden" id="note-tech-id"/>
         </div>
       </div>
 
@@ -2004,6 +1996,39 @@ async function pullAllFromAPI(isRetry = false) {
   } finally {
     // Hanya reset inProgress jika tidak ada retry terjadwal
     if (!PULL.retryTimer) PULL.inProgress = false;
+  }
+}
+
+function onTechCheckboxChange(el, techId) {
+  const wrap = document.getElementById('note-tech-checkboxes');
+  const hidden = document.getElementById('note-tech-id');
+
+  // Uncheck semua yang lain (single selection via checkbox)
+  wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if (cb !== el) {
+      cb.checked = false;
+      const lbl = cb.closest('label');
+      if (lbl) {
+        lbl.style.background = 'var(--bg2)';
+        lbl.style.borderColor = 'var(--border)';
+      }
+    }
+  });
+
+  // Update style label yang diklik
+  const lbl = el.closest('label');
+  if (el.checked) {
+    hidden.value = techId;
+    if (lbl) {
+      lbl.style.background = 'rgba(74,158,63,.1)';
+      lbl.style.borderColor = 'rgba(74,158,63,.3)';
+    }
+  } else {
+    hidden.value = '';
+    if (lbl) {
+      lbl.style.background = 'var(--bg2)';
+      lbl.style.borderColor = 'var(--border)';
+    }
   }
 }
 
@@ -2858,15 +2883,16 @@ function renderReports() {
   }).join('');
 
   document.getElementById('rep-by-type').innerHTML = renderBar(
-    ['Troubleshooting','Improvement','Preventive Maintenance','Corrective Maintenance','Monitoring','Inspection']
+    ['Troubleshooting','Improvement','Fabrication/Modification','Preventive Maintenance','Corrective Maintenance','Monitoring','Inspection']
       .map(t => [t, all.filter(w=>w.type===t).length]),
     {
-      'Troubleshooting': 'var(--orange)',
-      'Improvement':     'var(--purple)',
+      'Troubleshooting':        'var(--orange)',
+      'Improvement':            'var(--purple)',
+      'Fabrication/Modification': '#e91e8c',
       'Preventive Maintenance': 'var(--blue)',
       'Corrective Maintenance': 'var(--red)',
-      'Monitoring': 'var(--teal)',
-      'Inspection': 'var(--green)',
+      'Monitoring':             'var(--teal)',
+      'Inspection':             'var(--green)',
     }
   );
   document.getElementById('rep-by-priority').innerHTML = renderBar(
@@ -3063,15 +3089,28 @@ function openNoteModal(woId, action) {
     document.getElementById('note-duration').value   = '';
     document.getElementById('note-duration-calc').textContent = '';
 
-    // Populate technician list
-    const sel = document.getElementById('note-tech-id');
-    sel.innerHTML = '<option value="">— Pilih Teknisi —</option>';
+    // Populate technician checkboxes
+    const cbWrap = document.getElementById('note-tech-checkboxes');
+    cbWrap.innerHTML = '';
     WO.technicians.filter(t => t.status === 'Active').forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id; opt.textContent = t.name;
-      if (wo && wo.techId === t.id) opt.selected = true;
-      sel.appendChild(opt);
+      const isChecked = wo && wo.techId === t.id;
+      const div = document.createElement('label');
+      div.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 10px;
+        border-radius:7px;cursor:pointer;transition:background .12s;
+        background:${isChecked ? 'rgba(74,158,63,.1)' : 'var(--bg2)'};
+        border:1px solid ${isChecked ? 'rgba(74,158,63,.3)' : 'var(--border)'}`;
+      div.innerHTML = `
+        <input type="checkbox" value="${t.id}" ${isChecked ? 'checked' : ''}
+          style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0"
+          onchange="onTechCheckboxChange(this,'${t.id}')"/>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500;color:var(--navy)">${esc(t.name)}</div>
+          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-top:1px">${esc(t.spec||'')} · ${esc(t.shift||'')}</div>
+        </div>`;
+      cbWrap.appendChild(div);
     });
+    // Set hidden input jika ada default
+    if (wo && wo.techId) document.getElementById('note-tech-id').value = wo.techId;
 
     // Auto-calculate duration on time change (use onchange to avoid stacking listeners)
     ['note-start-day','note-start-time','note-end-day','note-end-time'].forEach(id => {
@@ -3083,26 +3122,40 @@ function openNoteModal(woId, action) {
 }
 
 function calcTimelineDuration() {
-  const DAYS = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'];
   const sd = document.getElementById('note-start-day').value;
   const st = document.getElementById('note-start-time').value;
   const ed = document.getElementById('note-end-day').value;
   const et = document.getElementById('note-end-time').value;
   const el = document.getElementById('note-duration-calc');
   if (!sd || !st || !ed || !et) { el.textContent = ''; return; }
-  const sdIdx = DAYS.indexOf(sd);
-  const edIdx = DAYS.indexOf(ed);
-  const [sh, sm] = st.split(':').map(Number);
-  const [eh, em] = et.split(':').map(Number);
-  let dayDiff = edIdx - sdIdx;
-  if (dayDiff < 0) dayDiff += 7; // wrap weekly
-  const startMins = sdIdx * 24 * 60 + sh * 60 + sm;
-  const endMins   = edIdx * 24 * 60 + eh * 60 + em;
-  let diffMins = endMins - startMins;
-  if (diffMins < 0) diffMins += 7 * 24 * 60;
-  const hours = (diffMins / 60).toFixed(2);
-  el.textContent = `→ Durasi: ${Math.floor(diffMins/60)} jam ${diffMins%60} menit (${hours} jam)`;
-  document.getElementById('note-duration').value = hours;
+
+  const startDt = new Date(`${sd}T${st}:00`);
+  const endDt   = new Date(`${ed}T${et}:00`);
+
+  if (isNaN(startDt) || isNaN(endDt)) { el.textContent = '⚠ Format tanggal/jam tidak valid'; return; }
+  if (endDt <= startDt) {
+    el.style.color = 'var(--red)';
+    el.textContent = '⚠ Tanggal/jam selesai harus setelah mulai';
+    document.getElementById('note-duration').value = '';
+    return;
+  }
+
+  el.style.color = 'var(--teal)';
+  const diffMs   = endDt - startDt;
+  const diffMins = Math.round(diffMs / 60000);
+  const days     = Math.floor(diffMins / (24 * 60));
+  const hours    = Math.floor((diffMins % (24 * 60)) / 60);
+  const mins     = diffMins % 60;
+  const totalHours = (diffMs / 3600000).toFixed(2);
+
+  let label = '→ Durasi: ';
+  if (days > 0)   label += `${days} hari `;
+  if (hours > 0)  label += `${hours} jam `;
+  if (mins > 0)   label += `${mins} menit `;
+  label += `(${totalHours} jam total)`;
+
+  el.textContent = label;
+  document.getElementById('note-duration').value = totalHours;
 }
 
 function confirmAction() {
@@ -3144,12 +3197,12 @@ function confirmAction() {
         addAudit(wo, 'status', `Teknisi yang menangani: ${getTechName(techId)}`);
       }
     }
-    if (startDay && startTime) wo.startTime = `${startDay} ${startTime}`;
-    if (endDay   && endTime)   wo.endTime   = `${endDay} ${endTime}`;
+    if (startDay && startTime) wo.startTime = `${fmtDate(startDay)} ${startTime}`;
+    if (endDay   && endTime)   wo.endTime   = `${fmtDate(endDay)} ${endTime}`;
 
     let auditMsg = `Durasi aktual: ${duration} jam`;
-    if (startDay && startTime) auditMsg += ` | Mulai: ${startDay} ${startTime}`;
-    if (endDay   && endTime)   auditMsg += ` | Selesai: ${endDay} ${endTime}`;
+    if (startDay && startTime) auditMsg += ` | Mulai: ${fmtDate(startDay)} ${startTime}`;
+    if (endDay   && endTime)   auditMsg += ` | Selesai: ${fmtDate(endDay)} ${endTime}`;
     if (noteText) auditMsg += ` | Catatan: ${noteText}`;
     addAudit(wo, 'note', auditMsg);
 
@@ -4147,8 +4200,9 @@ function badgeStatus(status) {
 }
 function badgeType(type) {
   const m = {
-    'Troubleshooting': 'b-troubleshooting',
-    'Improvement':     'b-improvement',
+    'Troubleshooting':          'b-troubleshooting',
+    'Improvement':              'b-improvement',
+    'Fabrication/Modification': 'b-fabrication',
   };
   return `<span class="badge ${m[type]||'b-other'}">${type||'—'}</span>`;
 }
@@ -4769,7 +4823,8 @@ async function generateExecutivePPT() {
       // WO per type
       const troubleshoot = list.filter(w => w.type === 'Troubleshooting').length;
       const improvement  = list.filter(w => w.type === 'Improvement').length;
-      return { list, done, open, high, rate, avgHrs, topEquip, troubleshoot, improvement, name: unitObj?.name || (unitKeyword === 'unit1' ? 'Unit 1' : 'Unit 2') };
+      const fabrication  = list.filter(w => w.type === 'Fabrication/Modification').length;
+      return { list, done, open, high, rate, avgHrs, topEquip, troubleshoot, improvement, fabrication, name: unitObj?.name || (unitKeyword === 'unit1' ? 'Unit 1' : 'Unit 2') };
     }
 
     // Monthly trend (12 bulan terakhir atau tahun ini)
@@ -5103,11 +5158,11 @@ async function buildAndDownloadPPT(d) {
 
     // Left: Pie chart (type distribution)
     sl.addChart(pres.charts.DOUGHNUT, [{
-      name: 'Tipe WO', labels: ['Troubleshooting','Improvement'],
-      values: [ unitData.troubleshoot, unitData.improvement ],
+      name: 'Tipe WO', labels: ['Troubleshooting','Improvement','Fabrication/Mod'],
+      values: [ unitData.troubleshoot, unitData.improvement, unitData.fabrication ],
     }], {
       x:0.3, y:2.18, w:3.5, h:2.85,
-      chartColors:[ C.orange, C.blue ],
+      chartColors:[ C.orange, C.blue, 'E91E8C' ],
       chartArea:{ fill:{ color: C.white }, roundedCorners:true },
       showLegend:true, legendPos:'b',
       showLabel:true, showPercent:true,
@@ -5606,16 +5661,24 @@ function executePrint() {
     <div class="print-by-group">
       <div class="print-group-box">
         <div class="print-group-title">Distribusi Status</div>
-        ${mkBar('Done',     filtered.filter(w=>w.status==='Done').length,     total, '#4a9e3f')}
+        ${mkBar('Done',        filtered.filter(w=>w.status==='Done').length,        total, '#4a9e3f')}
         ${mkBar('In Progress', filtered.filter(w=>w.status==='In Progress').length, total, '#f0b429')}
-        ${mkBar('Open',     filtered.filter(w=>w.status==='Open').length,     total, '#2b6cb8')}
-        ${mkBar('Cancelled',filtered.filter(w=>w.status==='Cancelled').length,total, '#c0392b')}
+        ${mkBar('Open',        filtered.filter(w=>w.status==='Open').length,        total, '#2b6cb8')}
+        ${mkBar('Cancelled',   filtered.filter(w=>w.status==='Cancelled').length,   total, '#c0392b')}
       </div>
       <div class="print-group-box">
         <div class="print-group-title">Distribusi Prioritas</div>
-        ${mkBar('High',     filtered.filter(w=>w.priority==='High').length,     total, '#fb8c3a')}
-        ${mkBar('Medium',   filtered.filter(w=>w.priority==='Medium').length,   total, '#4a9e3f')}
-        ${mkBar('Low',      filtered.filter(w=>w.priority==='Low').length,      total, '#8891a8')}
+        ${mkBar('High',   filtered.filter(w=>w.priority==='High').length,   total, '#fb8c3a')}
+        ${mkBar('Medium', filtered.filter(w=>w.priority==='Medium').length, total, '#4a9e3f')}
+        ${mkBar('Low',    filtered.filter(w=>w.priority==='Low').length,    total, '#8891a8')}
+      </div>
+    </div>
+    <div class="print-by-group" style="margin-top:10pt">
+      <div class="print-group-box">
+        <div class="print-group-title">Distribusi Tipe WO</div>
+        ${mkBar('Troubleshooting',          filtered.filter(w=>w.type==='Troubleshooting').length,          total, '#fb8c3a')}
+        ${mkBar('Improvement',              filtered.filter(w=>w.type==='Improvement').length,              total, '#4a9e3f')}
+        ${mkBar('Fabrication/Modification', filtered.filter(w=>w.type==='Fabrication/Modification').length, total, '#e91e8c')}
       </div>
     </div>` : '';
 
@@ -6295,7 +6358,6 @@ function onCmpViewChange() {
 
 function renderComparison() {
   initComparisonYearDropdown();
-  // Set default bulan filter ke bulan sekarang
   const mf = document.getElementById('cmp-month-filter');
   if (mf && !mf.dataset.initialized) {
     mf.value = String(new Date().getMonth());
@@ -6303,16 +6365,14 @@ function renderComparison() {
   }
   const { periods, year } = getComparisonData();
 
-  // ── Summary cards ──
   const totalMasuk  = periods.reduce((s,p) => s+p.masuk,   0);
   const totalDone   = periods.reduce((s,p) => s+p.selesai, 0);
   const rate        = totalMasuk ? Math.round(totalDone / totalMasuk * 100) : 0;
   const selectedUnit = document.getElementById('cmp-unit')?.value || 'all';
-const filteredWO = selectedUnit === 'all'
-  ? WO.workorders
-  : WO.workorders.filter(w => w.unitId === selectedUnit);
-
-const backlog = filteredWO.filter(w =>
+  const filteredWO = selectedUnit === 'all'
+    ? WO.workorders
+    : WO.workorders.filter(w => w.unitId === selectedUnit);
+  const backlog = filteredWO.filter(w =>
     (w.status === 'Open' || w.status === 'In Progress') &&
     new Date(w.createdAt).getFullYear() <= year
   ).length;
@@ -6322,8 +6382,11 @@ const backlog = filteredWO.filter(w =>
   setText('cmp-avg-rate',   rate + '%');
   setText('cmp-backlog',    backlog);
 
-  // ── Chart ──
+  // ── Chart utama ──
   drawComparisonChart(periods);
+
+  // ── Grafik Distribusi Tipe ──
+  renderTypeDistributionChart(filteredWO);
 
   // ── Tabel ──
   const tbody = document.getElementById('cmp-tbody');
@@ -6338,7 +6401,6 @@ const backlog = filteredWO.filter(w =>
     const crColor = cr >= 80 ? 'var(--green2)' : cr >= 50 ? '#c07020' : cr > 0 ? 'var(--red)' : 'var(--text3)';
     const bl      = Math.max(0, cumulativeBacklog);
 
-    // Label periode: monthly = "Jan", weekly = "W11\n01 Mar–07 Mar"
     const periodeCell = p.dateLabel
       ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--navy)">${esc(p.label)}</div>
          <div style="font-size:10px;color:var(--text3);margin-top:2px;white-space:nowrap">${esc(p.dateLabel)}</div>`
@@ -6390,13 +6452,206 @@ const backlog = filteredWO.filter(w =>
     </tr>`;
   }).join('');
 
-  // Event delegation: klik row → buka modal detail
   tbody.onclick = function(e) {
     const row = e.target.closest('tr.cmp-row-clickable');
     if (!row) return;
     const idx = parseInt(row.dataset.rowIdx);
     if (!isNaN(idx)) openCmpDetailModal(periods[idx]);
   };
+}
+
+// ── Render grafik distribusi tipe WO ──
+function renderTypeDistributionChart(woList) {
+  const TYPE_CONFIG = [
+    { key: 'Troubleshooting',          color: '#fb8c3a', icon: '🔧' },
+    { key: 'Improvement',              color: '#4a9e3f', icon: '📈' },
+    { key: 'Fabrication/Modification', color: '#e91e8c', icon: '🔩' },
+  ];
+
+  const total = woList.length || 1;
+  const counts = TYPE_CONFIG.map(t => ({
+    ...t,
+    count: woList.filter(w => w.type === t.key).length,
+    wos:   woList.filter(w => w.type === t.key),
+  }));
+  const maxCount = Math.max(...counts.map(c => c.count), 1);
+
+  // Cek apakah container sudah ada, kalau belum inject setelah chart utama
+  let container = document.getElementById('cmp-type-dist-section');
+  if (!container) {
+    const chartPanel = document.querySelector('#page-comparison .detail-panel');
+    if (!chartPanel) return;
+    container = document.createElement('div');
+    container.id = 'cmp-type-dist-section';
+    container.className = 'detail-panel';
+    container.style.marginBottom = '20px';
+    chartPanel.after(container);
+  }
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:600;color:var(--navy)">📊 Distribusi per Tipe WO</div>
+      <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${woList.length} total WO</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+      ${counts.map(t => {
+        const pct = Math.round(t.count / total * 100);
+        const doneCount = t.wos.filter(w => w.status === 'Done').length;
+        const doneRate  = t.count ? Math.round(doneCount / t.count * 100) : 0;
+        return `
+          <div class="cmp-type-card" data-type="${esc(t.key)}"
+            style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+            padding:14px 16px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;
+            border-left:4px solid ${t.color}"
+            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='var(--shadow)';this.style.borderColor='${t.color}'"
+            onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor='${t.color}'"
+            onclick="openTypeWOModal('${esc(t.key)}')">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+              <div>
+                <div style="font-size:18px;margin-bottom:4px">${t.icon}</div>
+                <div style="font-size:12px;font-weight:600;color:var(--navy);line-height:1.3">${esc(t.key)}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:28px;font-weight:700;line-height:1;color:${t.color}">${t.count}</div>
+                <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">${pct}% dari total</div>
+              </div>
+            </div>
+            <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:8px">
+              <div style="height:100%;border-radius:3px;background:${t.color};width:${Math.round(t.count/maxCount*100)}%;transition:width .5s"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">
+              <span>✅ Selesai: <strong style="color:var(--green2)">${doneCount}</strong></span>
+              <span>Rate: <strong style="color:${doneRate>=70?'var(--green2)':doneRate>=40?'#c07020':'var(--red)'}">${t.count?doneRate+'%':'—'}</strong></span>
+            </div>
+            <div style="position:absolute;bottom:8px;right:10px;font-size:10px;color:var(--text3);
+              font-family:'IBM Plex Mono',monospace;opacity:.6">klik untuk detail →</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── Modal daftar WO berdasarkan tipe ──
+function openTypeWOModal(type) {
+  const TYPE_COLOR = {
+    'Troubleshooting':          '#fb8c3a',
+    'Improvement':              '#4a9e3f',
+    'Fabrication/Modification': '#e91e8c',
+  };
+  const TYPE_ICON = {
+    'Troubleshooting':          '🔧',
+    'Improvement':              '📈',
+    'Fabrication/Modification': '🔩',
+  };
+
+  const selectedUnit = document.getElementById('cmp-unit')?.value || 'all';
+  const year = parseInt(document.getElementById('cmp-year')?.value) || new Date().getFullYear();
+
+  let baseList = selectedUnit === 'all'
+    ? WO.workorders
+    : WO.workorders.filter(w => w.unitId === selectedUnit);
+
+  // Filter hanya tahun yang dipilih
+  baseList = baseList.filter(w => new Date(w.createdAt).getFullYear() === year);
+
+  const woList = baseList.filter(w => w.type === type)
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const color   = TYPE_COLOR[type] || 'var(--accent)';
+  const icon    = TYPE_ICON[type]  || '📋';
+  const done    = woList.filter(w => w.status === 'Done').length;
+  const open    = woList.filter(w => w.status === 'Open' || w.status === 'In Progress').length;
+  const rate    = woList.length ? Math.round(done / woList.length * 100) : 0;
+
+  const woRows = woList.length === 0
+    ? `<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">
+         Tidak ada WO tipe ini di tahun ${year}
+       </div>`
+    : woList.map(w => {
+        const tech = getTechName(w.techId) || '—';
+        const pColor = {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'};
+        return `<div style="display:flex;align-items:center;justify-content:space-between;
+          padding:10px 14px;border-bottom:1px solid var(--border);gap:10px;cursor:pointer;
+          transition:background .1s"
+          onmouseover="this.style.background='var(--green-light)'"
+          onmouseout="this.style.background=''"
+          data-wo-id="${esc(w.id)}"
+          onclick="document.getElementById('modal-type-wo').classList.remove('open');setTimeout(()=>showDetail(this.dataset.woId),150)">
+          <div style="min-width:0;flex:1">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${color};font-weight:700">${esc(w.id)}</span>
+              ${badgeStatus(w.status)}
+              ${badgePriority(w.priority)}
+            </div>
+            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;font-family:'IBM Plex Mono',monospace">
+              👤 ${esc(w.requestorName||'—')}
+              ${w.requestorDept?' · '+esc(w.requestorDept):''}
+              &nbsp;·&nbsp; 👷 ${esc(tech)}
+              &nbsp;·&nbsp; 📅 ${fmtDate(w.createdAt)}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            ${w.actualHours
+              ? `<div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--teal)">⏱ ${w.actualHours} jam</div>`
+              : w.dueDate
+              ? `<div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">📅 ${fmtDate(w.dueDate)}</div>`
+              : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+  // Buat atau reuse modal
+  let modal = document.getElementById('modal-type-wo');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-type-wo';
+    modal.style.cssText = `display:none;position:fixed;inset:0;background:rgba(26,58,107,.45);
+      backdrop-filter:blur(3px);z-index:500;align-items:center;justify-content:center;padding:20px`;
+    modal.innerHTML = `<div id="modal-type-wo-inner"
+      style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+      width:100%;max-width:640px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;
+      box-shadow:0 20px 60px rgba(26,58,107,.25)"></div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+
+  document.getElementById('modal-type-wo-inner').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+      background:var(--navy);border-bottom:3px solid ${color};flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff">${icon} ${esc(type)}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.6);font-family:'IBM Plex Mono',monospace;margin-top:2px">
+          Tahun ${year}${selectedUnit !== 'all' ? ' · ' + (selectedUnit === 'unit1' ? 'Unit 1' : 'Unit 2') : ''}
+        </div>
+      </div>
+      <button id="modal-type-wo-close"
+        style="background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);
+        width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--border);flex-shrink:0">
+      ${[
+        ['Total WO', woList.length, color],
+        ['Selesai',  done,          'var(--green2)'],
+        ['Rate',     rate+'%',      rate>=70?'var(--green2)':rate>=40?'#c07020':'var(--red)'],
+      ].map(([lbl,val,clr]) => `
+        <div style="padding:12px 16px;text-align:center;border-right:1px solid var(--border)">
+          <div style="font-size:22px;font-weight:700;color:${clr};line-height:1">${val}</div>
+          <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.06em">${lbl}</div>
+        </div>`).join('')}
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      ${woRows}
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);background:var(--bg3);flex-shrink:0;
+      font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;text-align:center">
+      Klik WO untuk melihat detail lengkap
+    </div>`;
+
+  modal.style.display = 'flex';
+
+  document.getElementById('modal-type-wo-close').addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
 }
 
 function drawComparisonChart(periods) {
@@ -6841,7 +7096,7 @@ async function exportComparisonPDF() {
   win.document.write(html);
   win.document.close();
   win.onload = () => { win.focus(); win.print(); };
-  toast('📄 Membuka jendela PDF...', 'success');
+  toast('📄 Open PDF...', 'success');
 }
 
 if (checkSession()) {
