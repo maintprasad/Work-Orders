@@ -949,6 +949,8 @@ input:checked + .slider:before{transform:translateX(18px)}
   .print-sig-box{border-top:1pt solid #999;padding-top:6pt;font-size:8pt;color:#555;text-align:center}
   @page{margin:15mm 12mm;size:A4 landscape}
 }
+
+html,body{overscroll-behavior:none;overscroll-behavior-y:none}
 </style>
 </head>
 <body>
@@ -2085,9 +2087,12 @@ let PP_SELECTED = { partId: null, qty: 1 };
 // INIT
 // ═══════════════════════════════════════════════════════════════
 function init() {
-  // Daftarkan halaman awal ke history supaya Back HP tidak langsung keluar
+  (function(){
+    var startY=0;
+    document.addEventListener('touchstart',function(e){startY=e.touches[0].clientY;},{passive:true});
+    document.addEventListener('touchmove',function(e){if(e.touches[0].clientY-startY>0&&window.scrollY===0)e.preventDefault();},{passive:false});
+  })();
   history.replaceState({ page: 'wo-list' }, '', '#wo-list');
-
   // Load cache ITEMS_DB untuk parts picker
   loadItemsDbCache();
 
