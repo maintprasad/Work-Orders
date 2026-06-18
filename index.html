@@ -198,10 +198,10 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Tabel horizontal scroll tidak trigger pull-to-refresh */
+/* Tabel horizontal scroll tidak trigger pull-to-refresh, tapi scroll vertikal tetap diteruskan ke .content */
 .tbl-wrap {
   overscroll-behavior-x: contain;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -2086,11 +2086,6 @@ let PP_SELECTED = { partId: null, qty: 1 };
 // INIT
 // ═══════════════════════════════════════════════════════════════
 function init() {
-  (function(){
-    var startY=0;
-    document.addEventListener('touchstart',function(e){startY=e.touches[0].clientY;},{passive:true});
-    document.addEventListener('touchmove',function(e){if(e.touches[0].clientY-startY>0&&window.scrollY===0)e.preventDefault();},{passive:false});
-  })();
   history.replaceState({ page: 'wo-list' }, '', '#wo-list');
   // Load cache ITEMS_DB untuk parts picker
   loadItemsDbCache();
@@ -2648,15 +2643,11 @@ function attachTableEvents() {
   const container = document.getElementById('wo-list-container');
   if (!container) return;
 
-  // Hapus listener lama (clone trick)
   const fresh = container.cloneNode(true);
   container.parentNode.replaceChild(fresh, container);
-
-  // Re-attach ke elemen baru
   const el = document.getElementById('wo-list-container');
 
   el.addEventListener('click', function(e) {
-    // Tombol copy
     const copyBtn = e.target.closest('.copy-btn[data-copy]');
     if (copyBtn) {
       e.stopPropagation();
@@ -2668,52 +2659,6 @@ function attachTableEvents() {
       return;
     }
 
-     function attachCardEvents() {
-  const container = document.getElementById('wo-list-container');
-  if (!container) return;
-
-  // Clone trick — hapus listener lama
-  const fresh = container.cloneNode(true);
-  container.parentNode.replaceChild(fresh, container);
-
-  const el = document.getElementById('wo-list-container');
-
-  el.addEventListener('click', function(e) {
-    // Tombol copy ⎘
-    const copyBtn = e.target.closest('.copy-btn[data-copy]');
-    if (copyBtn) {
-      e.stopPropagation();
-      const id = copyBtn.dataset.copy;
-      navigator.clipboard.writeText(id).catch(() => {});
-      copyBtn.textContent = '✓';
-      copyBtn.classList.add('copied');
-      setTimeout(() => { copyBtn.textContent = '⎘'; copyBtn.classList.remove('copied'); }, 1500);
-      return;
-    }
-
-    // Tombol edit ✏ di card
-    const editBtn = e.target.closest('.card-edit-btn[data-woid-b64]');
-    if (editBtn) {
-      e.stopPropagation();
-      openModal('wo', decodeURIComponent(escape(atob(editBtn.dataset.woidB64))));
-      return;
-    }
-
-    // Elemen yang harus stop propagation (tidak buka detail)
-    if (e.target.closest('.td-stopclick')) {
-      e.stopPropagation();
-      return;
-    }
-
-    // Klik card → buka detail
-    const card = e.target.closest('.wo-card-clickable[data-woid-b64]');
-    if (card) {
-      showDetail(decodeURIComponent(escape(atob(card.dataset.woidB64))));
-    }
-  });
-}
-
-    // Tombol detail 👁
     const detailBtn = e.target.closest('.td-btn-detail[data-woid-b64]');
     if (detailBtn) {
       e.stopPropagation();
@@ -2721,7 +2666,6 @@ function attachTableEvents() {
       return;
     }
 
-    // Tombol edit ✏
     const editBtn = e.target.closest('.td-btn-edit[data-woid-b64]');
     if (editBtn) {
       e.stopPropagation();
@@ -2729,7 +2673,6 @@ function attachTableEvents() {
       return;
     }
 
-    // Tombol hapus ✕
     const delBtn = e.target.closest('.td-btn-del[data-woid-b64]');
     if (delBtn) {
       e.stopPropagation();
@@ -2737,26 +2680,62 @@ function attachTableEvents() {
       return;
     }
 
-    // Klik td yang harus stop propagation
     if (e.target.closest('.td-stopclick')) {
       e.stopPropagation();
       return;
     }
 
-    // Klik row → buka detail
     const row = e.target.closest('tr.wo-row[data-woid-b64]');
     if (row) {
       showDetail(decodeURIComponent(escape(atob(row.dataset.woidB64))));
     }
   });
 
-  // Status dropdown change
   el.addEventListener('change', function(e) {
     const sel = e.target.closest('.td-statussel[data-woid-b64]');
     if (sel && sel.value) {
       const woId = decodeURIComponent(escape(atob(sel.dataset.woidB64)));
       quickStatusChange(woId, sel.value);
       sel.value = '';
+    }
+  });
+}
+
+function attachCardEvents() {
+  const container = document.getElementById('wo-list-container');
+  if (!container) return;
+
+  const fresh = container.cloneNode(true);
+  container.parentNode.replaceChild(fresh, container);
+  const el = document.getElementById('wo-list-container');
+
+  el.addEventListener('click', function(e) {
+    const copyBtn = e.target.closest('.copy-btn[data-copy]');
+    if (copyBtn) {
+      e.stopPropagation();
+      const id = copyBtn.dataset.copy;
+      navigator.clipboard.writeText(id).catch(() => {});
+      copyBtn.textContent = '✓';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = '⎘'; copyBtn.classList.remove('copied'); }, 1500);
+      return;
+    }
+
+    const editBtn = e.target.closest('.card-edit-btn[data-woid-b64]');
+    if (editBtn) {
+      e.stopPropagation();
+      openModal('wo', decodeURIComponent(escape(atob(editBtn.dataset.woidB64))));
+      return;
+    }
+
+    if (e.target.closest('.td-stopclick')) {
+      e.stopPropagation();
+      return;
+    }
+
+    const card = e.target.closest('.wo-card-clickable[data-woid-b64]');
+    if (card) {
+      showDetail(decodeURIComponent(escape(atob(card.dataset.woidB64))));
     }
   });
 }
