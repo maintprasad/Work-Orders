@@ -2,8 +2,14 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <title>Prasad Seeds — Work Order System</title>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="WO System"/>
+<meta name="theme-color" content="#1a3a6b"/>
+<meta name="format-detection" content="telephone=no"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 
@@ -154,6 +160,243 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
 .b-high-p{background:rgba(251,140,58,.18);color:var(--orange);border-color:rgba(251,140,58,.3)}
 .b-critical-p{background:rgba(192,57,43,.15);color:var(--red);border-color:rgba(192,57,43,.25);animation:lowblink 1.4s infinite}
 @keyframes lowblink{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* ══════════════════════════════════════════════════════
+   MOBILE OVERSCROLL & PULL-TO-REFRESH PREVENTION
+   ══════════════════════════════════════════════════════ */
+
+/* Blokir pull-to-refresh di level browser */
+html {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  /* Safe area untuk iPhone notch & home bar */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Konten utama tidak boleh trigger overscroll */
+.content {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Sidebar scroll terbatas di dalam saja */
+.sidebar {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modal scroll terbatas di dalam modal saja */
+.modal-body {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tabel horizontal scroll tidak trigger pull-to-refresh */
+.tbl-wrap {
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Parts picker & overlay scroll */
+.parts-picker-list,
+.overlay {
+  overscroll-behavior: contain;
+}
+
+/* ══════════════════════════════════════════════════════
+   TOUCH TARGET — minimum 44px sesuai Apple HIG
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Tombol nav bottom — pastikan cukup tinggi untuk jempol */
+  .mnav-btn {
+    min-height: 52px;
+    padding: 8px 4px;
+  }
+
+  /* Tombol aksi di tabel — perbesar touch area */
+  .btn-icon {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 15px !important;
+  }
+
+  .btn-sm {
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+  }
+
+  /* Checkbox di modal Done — lebih gampang disentuh */
+  .note-tech-checkboxes label {
+    padding: 12px 14px !important;
+    margin-bottom: 4px;
+  }
+
+  /* Star rating — lebih besar di mobile */
+  .star-btn {
+    font-size: 32px !important;
+    padding: 6px !important;
+  }
+
+  /* Checklist item — area tap lebih luas */
+  .checklist-item {
+    padding: 12px 4px !important;
+  }
+
+  /* Input & select — cegah zoom otomatis iOS (min 16px) */
+  .finput,
+  .fsel2,
+  .ftextarea,
+  input[type="text"],
+  input[type="password"],
+  input[type="date"],
+  input[type="time"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Topbar — pastikan tidak terpotong */
+  .topbar {
+    padding: 0 10px !important;
+    height: 50px !important;
+    position: sticky !important;
+    top: 0 !important;
+  }
+
+  .brand img {
+    height: 30px !important;
+  }
+
+  /* Content tidak tertutup mobile nav */
+  .content {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Mobile nav — pin ke bawah dengan safe area */
+  .mobile-nav {
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+
+  /* Detail layout — 1 kolom penuh */
+  .detail-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stat grid — 2 kolom di mobile, tidak overflow */
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .stat-val {
+    font-size: 22px !important;
+  }
+
+  /* WO Card — full width */
+  .wo-board {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Modal — full screen bawah di mobile */
+  .modal {
+    max-height: calc(96vh - env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Toolbar filter — scroll horizontal */
+  #toolbar-filter2 {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  #toolbar-filter2::-webkit-scrollbar { display: none; }
+
+  /* Status flow — wrap lebih baik */
+  .status-flow {
+    gap: 3px !important;
+  }
+
+  .sf-step {
+    font-size: 10px !important;
+    padding: 4px 8px !important;
+  }
+
+  /* Audit trail — lebih compact */
+  .audit-ts {
+    font-size: 9px !important;
+  }
+
+  /* Comparison chart — tidak terpotong */
+  #cmp-chart {
+    min-height: 220px !important;
+    max-height: 280px !important;
+  }
+
+  /* Print summary grid — 2 kolom di mobile */
+  .print-summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* User badge — compact di mobile */
+  .user-info {
+    display: none !important;
+  }
+  .user-badge {
+    padding: 5px 8px !important;
+  }
+}
+
+/* iPhone SE / layar sangat kecil (< 375px) */
+@media (max-width: 375px) {
+  .stat-val {
+    font-size: 18px !important;
+  }
+
+  .mnav-btn {
+    font-size: 9px !important;
+  }
+
+  .mnav-ico {
+    font-size: 16px !important;
+  }
+
+  .topbar {
+    height: 46px !important;
+  }
+
+  .sec-title {
+    font-size: 16px !important;
+  }
+}
+
+/* Landscape mobile — manfaatkan lebar layar */
+@media (max-width: 768px) and (orientation: landscape) {
+  .content {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .modal {
+    max-height: 90vh !important;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
 
 /* ── RATING STARS ── */
 .star-rating{display:flex;align-items:center;gap:3px}
@@ -1757,7 +2000,13 @@ _Terima kasih. WO telah ditutup._</div>
       </div>
 
       <!-- Filter tambahan -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        <div class="fg">
+          <label class="flabel">Filter Unit</label>
+          <select class="fsel2" id="print-filter-unit">
+            <option value="">Semua Unit</option>
+          </select>
+        </div>
         <div class="fg">
           <label class="flabel">Filter Status</label>
           <select class="fsel2" id="print-filter-status">
@@ -1802,6 +2051,7 @@ _Terima kasih. WO telah ditutup._</div>
 
       <div class="form-actions" style="margin-top:16px">
         <button class="btn-ghost" onclick="closeModal('print')">Batal</button>
+        <button class="btn-ghost" id="btn-export-excel" onclick="exportPrintExcel()">📊 Export Excel</button>
         <button class="btn-primary" onclick="executePrint()">🖨 Cetak Sekarang</button>
       </div>
     </div>
@@ -3165,6 +3415,41 @@ function confirmAction() {
   const wo = WO.workorders.find(w => w.id === woId);
   if (!wo) return;
 
+  // ── Validasi wajib isi untuk aksi "done" ──
+  if (action === 'done') {
+    const startDayV  = document.getElementById('note-start-day').value;
+    const startTimeV = document.getElementById('note-start-time').value;
+    const endDayV    = document.getElementById('note-end-day').value;
+    const endTimeV   = document.getElementById('note-end-time').value;
+    const durationV  = parseFloat(document.getElementById('note-duration').value) || 0;
+    const techIdV    = document.getElementById('note-tech-id').value;
+
+    const missing = [];
+    if (!startDayV)  missing.push('Tanggal Mulai');
+    if (!startTimeV) missing.push('Jam Mulai');
+    if (!endDayV)     missing.push('Tanggal Selesai');
+    if (!endTimeV)    missing.push('Jam Selesai');
+    if (!techIdV)     missing.push('Teknisi yang Menangani');
+    if (durationV <= 0) missing.push('Durasi Aktual');
+
+    if (missing.length) {
+      toast('⚠ Lengkapi dulu: ' + missing.join(', '), 'error');
+      return;
+    }
+
+    // Validasi tambahan: pastikan waktu selesai setelah waktu mulai
+    const startDt = new Date(`${startDayV}T${startTimeV}:00`);
+    const endDt   = new Date(`${endDayV}T${endTimeV}:00`);
+    if (isNaN(startDt) || isNaN(endDt)) {
+      toast('⚠ Format tanggal/jam tidak valid', 'error');
+      return;
+    }
+    if (endDt <= startDt) {
+      toast('⚠ Waktu selesai harus setelah waktu mulai', 'error');
+      return;
+    }
+  }
+
   if (action === 'assign') {
     const techId = document.getElementById('assign-tech-id')?.value;
     if (!techId) { toast('Pilih teknisi dulu', 'error'); return; }
@@ -4525,8 +4810,9 @@ function applySimpleMode() {
 }
 
 // Cek apakah role perlu unit selector
+// DINONAKTIFKAN: filter unit otomatis tidak dipakai lagi — selalu false
 function needsUnitSelector(role) {
-  return role === 'Admin' || role === 'SPV';
+  return false;
 }
 
 // ── LOGIN — data user diambil dari Google Sheets, fallback ke cache lokal ──
@@ -4637,6 +4923,12 @@ function checkSession() {
   if (!stored) return false;
   try {
     SESSION = JSON.parse(stored);
+    // Bersihkan sisa pilihan unit lama — fitur unit selector dinonaktifkan
+    if (SESSION && SESSION.selectedUnit) {
+      delete SESSION.selectedUnit;
+      delete SESSION.selectedUnitName;
+      localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
+    }
     const users = loadUsers();
     // Jika cache users masih kosong (baru clear storage), tetap izinkan session
     // dengan data yang tersimpan di AUTH_KEY — akan divalidasi saat aksi berikutnya
@@ -5532,6 +5824,18 @@ async function sendWANotif(type, wo) {
 function openPrintModal() {
   // Default range: 30 hari terakhir
   setPrintRange(30);
+  // Isi dropdown filter unit dari EQUIP_DB
+  const unitSel = document.getElementById('print-filter-unit');
+  if (unitSel) {
+    const curVal = unitSel.value;
+    unitSel.innerHTML = '<option value="">Semua Unit</option>';
+    (EQUIP_DB.units || []).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.textContent = u.name;
+      if (u.id === curVal) opt.selected = true;
+      unitSel.appendChild(opt);
+    });
+  }
   updatePrintCount();
   document.getElementById('modal-print').classList.add('open');
 }
@@ -5580,16 +5884,20 @@ function updatePrintCount() {
 function getPrintData() {
   const fromVal = document.getElementById('print-date-from')?.value;
   const toVal   = document.getElementById('print-date-to')?.value;
+  const fUnit   = document.getElementById('print-filter-unit')?.value || '';
   const fStatus = document.getElementById('print-filter-status')?.value || '';
   const fPri    = document.getElementById('print-filter-priority')?.value || '';
 
   const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
   const to   = toVal   ? new Date(toVal   + 'T23:59:59') : null;
 
-  const filtered = WO.workorders.filter(w => {
+  const base = getVisibleWO();
+
+  const filtered = base.filter(w => {
     const d = new Date(w.createdAt);
     if (from && d < from) return false;
     if (to   && d > to)   return false;
+    if (fUnit   && w.unitId   !== fUnit)   return false;
     if (fStatus && w.status   !== fStatus) return false;
     if (fPri    && w.priority !== fPri)    return false;
     return true;
@@ -5796,30 +6104,41 @@ function executePrint() {
     </table>`;
 
   // ── Tabel Detail WO ──
+  // Helper: pisahkan "16 Jun 2026 14:30" jadi { tgl:"16 Jun 2026", jam:"14:30" }
+  function splitDateTime(val) {
+    if (!val) return { tgl: '—', jam: '—' };
+    const parts = String(val).trim().split(' ');
+    if (parts.length >= 4) {
+      // format: "16 Jun 2026 14:30" → 3 token tanggal + 1 token jam
+      const jam = parts.pop();
+      return { tgl: parts.join(' '), jam: jam || '—' };
+    }
+    return { tgl: val, jam: '—' };
+  }
+
   const tableRows = filtered.map((w, i) => {
-    const equip = getEquipName(w.equipId) || '—';
-    const tech  = getTechName(w.techId)  || '—';
-    const unit  = w.unitId ? getUnitName(w.unitId) : '—';
     const clDone  = (w.checklist||[]).filter(c=>c.done).length;
     const clTotal = (w.checklist||[]).length;
-    const partsStr = (w.partsUsed||[]).map(p=>`${p.name}×${p.qty}`).join(', ') || '—';
+    const start = splitDateTime(w.startTime); // dari proses "Tandai Selesai"
+    const end   = splitDateTime(w.endTime);   // dari proses "Tandai Selesai"
     const notesCell = optNotes
       ? `<td style="max-width:100pt;font-size:7.5pt;color:#555">${esc((w.notes||w.closingNote||'—').substring(0,80))}</td>`
       : '';
     return `<tr>
-      <td style="font-family:monospace;font-size:7.5pt;white-space:nowrap;font-weight:600;color:#1a3a6b">${esc(w.id)}</td>
-      <td style="max-width:140pt"><div style="font-weight:500">${esc(w.title)}</div>
+      <td style="max-width:150pt">
+        <div style="font-family:monospace;font-size:7pt;color:#1a3a6b;font-weight:600">${esc(w.id)}</div>
+        <div style="font-weight:500">${esc(w.title)}</div>
         <div style="font-size:7pt;color:#666;margin-top:2pt">${esc(w.requestorName||'')}${w.requestorDept?' · '+esc(w.requestorDept):''}</div>
       </td>
       <td style="white-space:nowrap"><span class="pb ${priBadgeClass(w.priority)}">${w.priority}</span></td>
       <td><span class="pb ${statusBadgeClass(w.status)}">${w.status}</span></td>
-      <td style="font-size:7.5pt;white-space:nowrap">${fmtDate(w.createdAt)}</td>
-      <td style="font-size:7.5pt;white-space:nowrap">${w.dueDate ? fmtDate(w.dueDate) : '—'}</td>
-      <td style="font-size:7.5pt">${esc(unit)}</td>
-      <td style="font-size:7.5pt">${esc(equip)}</td>
-      <td style="font-size:7.5pt">${esc(tech)}</td>
+      <td style="font-size:7.5pt">${esc(w.type||'—')}</td>
+      <td style="font-size:7.5pt;white-space:nowrap">${esc(start.tgl)}</td>
+      <td style="font-size:7.5pt;white-space:nowrap;text-align:center">${esc(start.jam)}</td>
+      <td style="font-size:7.5pt;white-space:nowrap">${esc(end.tgl)}</td>
+      <td style="font-size:7.5pt;white-space:nowrap;text-align:center">${esc(end.jam)}</td>
       <td style="font-size:7.5pt;text-align:center">${clTotal ? clDone+'/'+clTotal : '—'}</td>
-      <td style="font-size:7.5pt;white-space:nowrap">${w.actualHours ? w.actualHours+' jam' : (w.estHours ? '~'+w.estHours+' jam' : '—')}</td>
+      <td style="font-size:7.5pt;white-space:nowrap;font-weight:600;color:#2a7a5a">${w.actualHours ? w.actualHours+' jam' : '—'}</td>
       ${optNotes ? notesCell : ''}
     </tr>`;
   }).join('');
@@ -5829,8 +6148,8 @@ function executePrint() {
     <table class="print-table">
       <thead>
         <tr>
-          <th>WO ID</th><th>Judul / Requestor</th><th>Prioritas</th><th>Status</th>
-          <th>Dibuat</th><th>Target</th><th>Unit</th><th>Equipment</th><th>Teknisi</th>
+          <th>Judul / Requestor</th><th>Prioritas</th><th>Status</th><th>Tipe</th>
+          <th>Dikerjakan Tgl</th><th>Mulai Jam</th><th>Selesai Tgl</th><th>Selesai Jam</th>
           <th>Checklist</th><th>Durasi</th>
           ${optNotes ? '<th>Catatan</th>' : ''}
         </tr>
@@ -5847,6 +6166,8 @@ function executePrint() {
     </div>` : '';
 
   // ── Rakit dokumen ──
+  // NOTE: areaSummaryHtml (Summary per Unit · Area · Equipment) sengaja TIDAK
+  // disertakan lagi di laporan cetak — sesuai permintaan, tabel ini dihilangkan.
   const docHtml = `
     <div class="print-doc">
       <div class="print-header">
@@ -5854,6 +6175,7 @@ function executePrint() {
           <div class="print-company">PT PRASAD SEEDS INDONESIA</div>
           <div class="print-doc-title">Laporan Progress Work Order — Departemen Maintenance</div>
           <div style="font-size:9pt;color:#3a5a3a;margin-top:4pt">Periode: <strong>${periodeStr}</strong>
+            ${document.getElementById('print-filter-unit')?.value ? ' | Unit: '+getUnitName(document.getElementById('print-filter-unit').value) : ''}
             ${document.getElementById('print-filter-status')?.value ? ' | Status: '+document.getElementById('print-filter-status').value : ''}
             ${document.getElementById('print-filter-priority')?.value ? ' | Prioritas: '+document.getElementById('print-filter-priority').value : ''}
           </div>
@@ -5866,7 +6188,6 @@ function executePrint() {
       </div>
       ${kpiHtml}
       ${chartHtml}
-      ${areaSummaryHtml}
       ${tableHtml}
       ${signHtml}
       <div class="print-footer">
@@ -5888,6 +6209,314 @@ function executePrint() {
     // Kembali ke halaman semula setelah dialog print ditutup
     setTimeout(() => navigateTo(prevPage), 500);
   }, 250);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT EXCEL — Laporan WO (struktur & data sama persis dengan PDF)
+// ═══════════════════════════════════════════════════════════════
+
+// ▼▼▼ TEMPAT MENULISKAN BASE64 LOGO PERUSAHAAN ▼▼▼
+// Isi string di bawah ini dengan base64 logo Anda (format: data:image/png;base64,xxxxx
+// atau cukup base64-nya saja tanpa prefix "data:image/png;base64,")
+// Contoh logo yang sudah ada di file ini bisa dipakai ulang dari <img src="data:image/png;base64,...">
+const EXCEL_LOGO_BASE64 = ''; // <-- TULIS BASE64 LOGO DI SINI (tanpa prefix data:image/png;base64,)
+// ▲▲▲ AKHIR TEMPAT LOGO ▲▲▲
+
+async function exportPrintExcel() {
+  const btn = document.getElementById('btn-export-excel');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating...'; }
+
+  try {
+    // Load ExcelJS dari CDN kalau belum ada
+    if (typeof ExcelJS === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const { filtered, fromVal, toVal } = getPrintData();
+    if (!filtered.length) { toast('Tidak ada WO untuk diekspor', 'error'); return; }
+
+    const optSummary = document.getElementById('print-opt-summary').checked;
+    const optChart   = document.getElementById('print-opt-chart').checked;
+    const optTable   = document.getElementById('print-opt-table').checked;
+    const optNotes   = document.getElementById('print-opt-notes').checked;
+    const optSign    = document.getElementById('print-opt-sign').checked;
+
+    const now      = new Date();
+    const nowStr   = now.toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
+    const nowTime  = now.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    const periodeStr = fromVal && toVal
+      ? `${fmtDate(fromVal)} — ${fmtDate(toVal)}`
+      : (fromVal ? `Sejak ${fmtDate(fromVal)}` : 'Semua Periode');
+    const unitFilterVal = document.getElementById('print-filter-unit')?.value || '';
+    const unitLabel = unitFilterVal ? getUnitName(unitFilterVal) : '';
+    const statusFilterVal = document.getElementById('print-filter-status')?.value || '';
+    const priFilterVal    = document.getElementById('print-filter-priority')?.value || '';
+
+    // ── KPI stats (identik dengan executePrint) ──
+    const total    = filtered.length;
+    const done     = filtered.filter(w => w.status === 'Done').length;
+    const inProg   = filtered.filter(w => w.status === 'In Progress').length;
+    const open     = filtered.filter(w => w.status === 'Open').length;
+    const rate     = total ? Math.round(done / total * 100) : 0;
+    const avgHoursVal = (() => {
+      const doneWO = filtered.filter(w => w.status === 'Done' && parseFloat(w.actualHours) > 0);
+      if (!doneWO.length) return null;
+      return +(doneWO.reduce((s,w) => s + parseFloat(w.actualHours||0), 0) / doneWO.length).toFixed(1);
+    })();
+
+    // ── Distribusi (identik dengan chartHtml di executePrint) ──
+    const distStatus = [
+      ['Done',        filtered.filter(w=>w.status==='Done').length,        'FF4A9E3F'],
+      ['In Progress', filtered.filter(w=>w.status==='In Progress').length, 'FFF0B429'],
+      ['Open',        filtered.filter(w=>w.status==='Open').length,        'FF2B6CB8'],
+      ['Cancelled',   filtered.filter(w=>w.status==='Cancelled').length,   'FFC0392B'],
+    ];
+    const distPriority = [
+      ['High',   filtered.filter(w=>w.priority==='High').length,   'FFFB8C3A'],
+      ['Medium', filtered.filter(w=>w.priority==='Medium').length, 'FF4A9E3F'],
+      ['Low',    filtered.filter(w=>w.priority==='Low').length,    'FF8891A8'],
+    ];
+    const distType = [
+      ['Troubleshooting',          filtered.filter(w=>w.type==='Troubleshooting').length,          'FFFB8C3A'],
+      ['Improvement',               filtered.filter(w=>w.type==='Improvement').length,               'FF4A9E3F'],
+      ['Fabrication/Modification',  filtered.filter(w=>w.type==='Fabrication/Modification').length,  'FFE91E8C'],
+    ];
+
+    // ════════════════════════════════════════════════════════
+    // BUILD WORKBOOK
+    // ════════════════════════════════════════════════════════
+    const wb = new ExcelJS.Workbook();
+    wb.creator = SESSION?.nama || 'WO System';
+    wb.created = now;
+    const sheet = wb.addWorksheet('Laporan WO', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+      views: [{ showGridLines: false }],
+    });
+
+    const NAVY   = 'FF1A3A6B';
+    const GREEN  = 'FF4A9E3F';
+    const LIGHT  = 'FFEEF3EE';
+    const WHITE  = 'FFFFFFFF';
+    const TEXT2  = 'FF3A5A3A';
+    const MUTED  = 'FF7A9A7A';
+
+    let r = 1; // row cursor
+
+    // ── Logo (jika EXCEL_LOGO_BASE64 sudah diisi) ──
+    if (EXCEL_LOGO_BASE64) {
+      const imgId = wb.addImage({ base64: EXCEL_LOGO_BASE64, extension: 'png' });
+      sheet.addImage(imgId, { tl: { col: 0, row: 0 }, ext: { width: 140, height: 40 } });
+      sheet.getRow(1).height = 30;
+      sheet.getRow(2).height = 16;
+      r = 3;
+    }
+
+    // ── Header dokumen ──
+    sheet.mergeCells(`A${r}:F${r}`);
+    sheet.getCell(`A${r}`).value = 'PT PRASAD SEEDS INDONESIA';
+    sheet.getCell(`A${r}`).font  = { bold: true, size: 14, color: { argb: NAVY } };
+    r++;
+    sheet.mergeCells(`A${r}:F${r}`);
+    sheet.getCell(`A${r}`).value = 'Laporan Progress Work Order — Departemen Maintenance';
+    sheet.getCell(`A${r}`).font  = { italic: true, size: 11, color: { argb: TEXT2 } };
+    r++;
+
+    let metaLine = `Periode: ${periodeStr}`;
+    if (unitLabel)       metaLine += `  |  Unit: ${unitLabel}`;
+    if (statusFilterVal) metaLine += `  |  Status: ${statusFilterVal}`;
+    if (priFilterVal)    metaLine += `  |  Prioritas: ${priFilterVal}`;
+    sheet.mergeCells(`A${r}:F${r}`);
+    sheet.getCell(`A${r}`).value = metaLine;
+    sheet.getCell(`A${r}`).font  = { size: 9, color: { argb: TEXT2 } };
+    r++;
+    sheet.mergeCells(`A${r}:F${r}`);
+    sheet.getCell(`A${r}`).value = `Dicetak: ${nowStr} ${nowTime}  |  Operator: ${SESSION?.nama||'—'} (${SESSION?.role||'—'})  |  Total WO: ${total} | Selesai: ${done} (${rate}%)`;
+    sheet.getCell(`A${r}`).font  = { size: 8.5, color: { argb: MUTED } };
+    r += 2;
+
+    // ── Summary KPI ──
+    if (optSummary) {
+      const kpiRowStart = r;
+      const kpis = [
+        ['Total WO', total],
+        ['Selesai', done],
+        ['Completion Rate', rate + '%'],
+        ['In Progress', inProg],
+        ['Avg Durasi', avgHoursVal ? avgHoursVal + ' jam' : '—'],
+      ];
+      kpis.forEach((k, i) => {
+        const col = String.fromCharCode(65 + i); // A,B,C,D,E
+        sheet.getCell(`${col}${r}`).value = k[1];
+        sheet.getCell(`${col}${r}`).font  = { bold: true, size: 16, color: { argb: NAVY } };
+        sheet.getCell(`${col}${r}`).alignment = { horizontal: 'center' };
+        sheet.getCell(`${col}${r+1}`).value = k[0];
+        sheet.getCell(`${col}${r+1}`).font  = { size: 8, color: { argb: MUTED } };
+        sheet.getCell(`${col}${r+1}`).alignment = { horizontal: 'center' };
+        sheet.getColumn(col).width = 16;
+      });
+      r += 3;
+    }
+
+    // ── Distribusi + Chart ──
+    if (optChart) {
+      sheet.mergeCells(`A${r}:F${r}`);
+      sheet.getCell(`A${r}`).value = 'GRAFIK DISTRIBUSI';
+      sheet.getCell(`A${r}`).font  = { bold: true, size: 10, color: { argb: NAVY } };
+      sheet.getCell(`A${r}`).border = { bottom: { style: 'thin', color: { argb: GREEN } } };
+      r += 1;
+
+      const distGroups = [
+        { title: 'Distribusi Status',    data: distStatus },
+        { title: 'Distribusi Prioritas', data: distPriority },
+        { title: 'Distribusi Tipe WO',   data: distType },
+      ];
+
+      distGroups.forEach(group => {
+        const dataStartRow = r + 1;
+        sheet.getCell(`A${r}`).value = group.title;
+        sheet.getCell(`A${r}`).font  = { bold: true, size: 9, color: { argb: NAVY } };
+        r++;
+        const labelColStart = r;
+        group.data.forEach(([label, count]) => {
+          sheet.getCell(`A${r}`).value = label;
+          sheet.getCell(`B${r}`).value = count;
+          sheet.getCell(`B${r}`).font  = { bold: true };
+          r++;
+        });
+        const labelColEnd = r - 1;
+
+        // Buat chart bar native dari range data ini
+        const chart = wb.addChart ? null : null; // placeholder guard (ExcelJS chart API below)
+        try {
+          const chartObj = sheet.addChart ? null : null;
+        } catch(e) {}
+
+        // ExcelJS native chart (addChart tersedia di ExcelJS >= 4.x via workbook? — gunakan addChartSheet alt)
+        // Catatan: ExcelJS browser build mendukung chart melalui `sheet.addChart` pada versi tertentu.
+        try {
+          sheet.addChart({
+            type: 'bar',
+            data: {
+              categories: `'Laporan WO'!$A$${labelColStart}:$A$${labelColEnd}`,
+              series: [{ name: group.title, values: `'Laporan WO'!$B$${labelColStart}:$B$${labelColEnd}` }],
+            },
+            position: { tl: { col: 3, row: dataStartRow - 1 }, ext: { width: 320, height: 140 } },
+          });
+        } catch(e) {
+          // Jika versi ExcelJS yang dimuat tidak mendukung addChart, lewati pembuatan chart
+          // tapi data tabel tetap tersimpan di kolom A:B sebagai fallback
+        }
+        r += 2;
+      });
+      r += 1;
+    }
+
+    // ── Tabel Detail WO ──
+    if (optTable) {
+      sheet.mergeCells(`A${r}:J${r}`);
+      sheet.getCell(`A${r}`).value = 'DETAIL WORK ORDER';
+      sheet.getCell(`A${r}`).font  = { bold: true, size: 10, color: { argb: NAVY } };
+      sheet.getCell(`A${r}`).border = { bottom: { style: 'thin', color: { argb: GREEN } } };
+      r++;
+
+      const headers = ['Judul / Requestor','Prioritas','Status','Tipe','Dikerjakan Tgl','Mulai Jam','Selesai Tgl','Selesai Jam','Checklist','Durasi'];
+      if (optNotes) headers.push('Catatan');
+      const headerRow = sheet.getRow(r);
+      headers.forEach((h, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h;
+        cell.font  = { bold: true, color: { argb: WHITE }, size: 9 };
+        cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+        cell.alignment = { vertical: 'middle' };
+      });
+      r++;
+
+      function splitDT(val) {
+        if (!val) return { tgl: '—', jam: '—' };
+        const parts = String(val).trim().split(' ');
+        if (parts.length >= 4) { const jam = parts.pop(); return { tgl: parts.join(' '), jam: jam||'—' }; }
+        return { tgl: val, jam: '—' };
+      }
+
+      filtered.forEach((w, idx) => {
+        const clDone  = (w.checklist||[]).filter(c=>c.done).length;
+        const clTotal = (w.checklist||[]).length;
+        const start = splitDT(w.startTime);
+        const end   = splitDT(w.endTime);
+        const rowVals = [
+          `${w.id} — ${w.title}${w.requestorName ? '\n'+w.requestorName+(w.requestorDept?' · '+w.requestorDept:'') : ''}`,
+          w.priority || '—',
+          w.status || '—',
+          w.type || '—',
+          start.tgl, start.jam, end.tgl, end.jam,
+          clTotal ? `${clDone}/${clTotal}` : '—',
+          w.actualHours ? `${w.actualHours} jam` : '—',
+        ];
+        if (optNotes) rowVals.push((w.notes || w.closingNote || '—').substring(0, 200));
+
+        const row = sheet.getRow(r);
+        rowVals.forEach((v, i) => {
+          const cell = row.getCell(i + 1);
+          cell.value = v;
+          cell.font  = { size: 9 };
+          cell.alignment = { wrapText: true, vertical: 'top' };
+          if (idx % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT } };
+        });
+        r++;
+      });
+      r += 1;
+    }
+
+    // ── Tanda Tangan ──
+    if (optSign) {
+      const sigCols = ['A','D','G'];
+      const sigLabels = ['Mengetahui,\n\n\n\nMaintenance Manager','Diperiksa,\n\n\n\nSupervisor Maintenance',`Dibuat oleh,\n\n\n\n${SESSION?.nama||'Admin'}`];
+      sigCols.forEach((col, i) => {
+        sheet.getCell(`${col}${r}`).value = sigLabels[i];
+        sheet.getCell(`${col}${r}`).alignment = { wrapText: true };
+        sheet.getCell(`${col}${r}`).font = { size: 9 };
+      });
+      r += 6;
+    }
+
+    // ── Footer ──
+    sheet.mergeCells(`A${r}:J${r}`);
+    sheet.getCell(`A${r}`).value = `PT Prasad Seeds Indonesia — Sistem Work Order Maintenance | Dicetak: ${nowStr} ${nowTime} oleh ${SESSION?.nama||'—'}`;
+    sheet.getCell(`A${r}`).font  = { size: 7.5, color: { argb: MUTED }, italic: true };
+
+    // ── Lebar kolom tabel ──
+    if (optTable) {
+      sheet.getColumn('A').width = 38;
+      ['B','C','D'].forEach(c => sheet.getColumn(c).width = 14);
+      ['E','G'].forEach(c => sheet.getColumn(c).width = 13);
+      ['F','H'].forEach(c => sheet.getColumn(c).width = 9);
+      sheet.getColumn('I').width = 10;
+      sheet.getColumn('J').width = 10;
+      if (optNotes) sheet.getColumn('K').width = 30;
+    }
+
+    // ── Trigger download ──
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/octet-stream' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Laporan_WO_${fromVal||'all'}_${toVal||'all'}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+
+    toast('✅ Excel berhasil diekspor', 'success');
+  } catch(e) {
+    console.error('Export Excel error:', e);
+    toast('❌ Gagal export Excel: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📊 Export Excel'; }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -6202,6 +6831,24 @@ function initComparisonYearDropdown() {
   sel.innerHTML = sorted.map(y =>
     `<option value="${y}" ${String(y) === cur ? 'selected' : ''}>${y}</option>`
   ).join('');
+
+  // Default dropdown Unit di Comparison ikut unit yang dipilih saat login —
+  // hanya sekali (flag _cmpUnitDefaulted) supaya tidak menimpa pilihan manual user
+  const unitSel = document.getElementById('cmp-unit');
+  if (unitSel && SESSION?.selectedUnit && !unitSel.dataset.defaulted) {
+    const matchedUnit = (EQUIP_DB.units || []).find(u => {
+      const n = u.id.toLowerCase().replace(/[\s\-_]/g,'');
+      const name = u.name.toLowerCase();
+      if (SESSION.selectedUnit === 'unit1') return n.includes('unit1') || name.includes('unit 1') || name.includes('unit1');
+      if (SESSION.selectedUnit === 'unit2') return n.includes('unit2') || name.includes('unit 2') || name.includes('unit2');
+      return false;
+    });
+    if (matchedUnit) {
+      const opt = [...unitSel.options].find(o => o.value === matchedUnit.id);
+      if (opt) unitSel.value = matchedUnit.id;
+    }
+    unitSel.dataset.defaulted = '1';
+  }
 }
 
 function getComparisonData() {
@@ -7115,7 +7762,7 @@ if (checkSession()) {
     init();
   }
   // Wire print modal filter changes → update count
-  ['print-date-from','print-date-to','print-filter-status','print-filter-priority'].forEach(id => {
+  ['print-date-from','print-date-to','print-filter-unit','print-filter-status','print-filter-priority'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', updatePrintCount);
   });
