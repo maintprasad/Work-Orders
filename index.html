@@ -2249,36 +2249,20 @@ async function pullAllFromAPI(isRetry = false) {
 }
 
 function onTechCheckboxChange(el, techId) {
-  const wrap = document.getElementById('note-tech-checkboxes');
+  const wrap   = document.getElementById('note-tech-checkboxes');
   const hidden = document.getElementById('note-tech-id');
 
-  // Uncheck semua yang lain (single selection via checkbox)
-  wrap.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    if (cb !== el) {
-      cb.checked = false;
-      const lbl = cb.closest('label');
-      if (lbl) {
-        lbl.style.background = 'var(--bg2)';
-        lbl.style.borderColor = 'var(--border)';
-      }
-    }
-  });
-
-  // Update style label yang diklik
+  // Multi-select: tidak ada lagi uncheck checkbox lain
   const lbl = el.closest('label');
-  if (el.checked) {
-    hidden.value = techId;
-    if (lbl) {
-      lbl.style.background = 'rgba(74,158,63,.1)';
-      lbl.style.borderColor = 'rgba(74,158,63,.3)';
-    }
-  } else {
-    hidden.value = '';
-    if (lbl) {
-      lbl.style.background = 'var(--bg2)';
-      lbl.style.borderColor = 'var(--border)';
-    }
+  if (lbl) {
+    lbl.style.background  = el.checked ? 'rgba(74,158,63,.1)'   : 'var(--bg2)';
+    lbl.style.borderColor = el.checked ? 'rgba(74,158,63,.3)'  : 'var(--border)';
   }
+
+  // Kumpulkan semua checkbox yang tercentang → simpan sebagai CSV di hidden input
+  const selectedIds = Array.from(wrap.querySelectorAll('input[type="checkbox"]:checked'))
+    .map(cb => cb.value);
+  hidden.value = selectedIds.join(',');
 }
 
 // Helper: update pill + syncStatus sekaligus
@@ -2592,7 +2576,7 @@ function resetAllFilters() {
 
 function woTableRow(w, showActions = false) {
   const equip = getEquipName(w.equipId);
-  const tech  = getTechName(w.techId);
+  const tech  = getTechNamesStr(w);
   const doneCount  = w.checklist?.filter(c => c.done).length || 0;
   const totalCount = w.checklist?.length || 0;
   const reqName = w.requestorName || '—';
@@ -2774,7 +2758,7 @@ function woCard(w) {
     <div class="wo-card-meta">
       ${reqName ? `<div class="wo-meta-row"><span class="wo-meta-ico">👤</span><span style="color:var(--blue)">${esc(reqName)}${reqDept ? ' · ' + esc(reqDept) : ''}</span></div>` : ''}
       ${w.equipId ? `<div class="wo-meta-row"><span class="wo-meta-ico">⚙</span>${esc(getEquipName(w.equipId)||w.equipId)}</div>` : ''}
-      ${w.techId  ? `<div class="wo-meta-row"><span class="wo-meta-ico">👷</span>${esc(getTechName(w.techId)||w.techId)}</div>`
+      ${(w.techIds&&w.techIds.length)||w.techId  ? `<div class="wo-meta-row"><span class="wo-meta-ico">👷</span>${esc(getTechNamesStr(w)||w.techId)}</div>`
                   : '<div class="wo-meta-row" style="color:var(--text3)"><span class="wo-meta-ico">👷</span>Belum ditugaskan</div>'}
       ${w.dueDate ? `<div class="wo-meta-row"><span class="wo-meta-ico">📅</span>${dueLabelHtml(w.dueDate, w.status)}</div>` : ''}
     </div>
@@ -2813,7 +2797,7 @@ function showDetail(woId) {
   const totalCount = wo.checklist?.length || 0;
   const pct        = totalCount ? Math.round(doneCount / totalCount * 100) : 0;
   const equip      = getEquipName(wo.equipId);
-  const tech       = getTechName(wo.techId);
+  const tech       = getTechNamesStr(wo);
   const reqName    = wo.requestorName || '—';
   const reqDept    = wo.requestorDept || '';
 
@@ -3322,11 +3306,14 @@ function openNoteModal(woId, action) {
     document.getElementById('note-duration').value   = '';
     document.getElementById('note-duration-calc').textContent = '';
 
-    // Populate technician checkboxes
+    // Populate technician checkboxes (multi-select)
     const cbWrap = document.getElementById('note-tech-checkboxes');
     cbWrap.innerHTML = '';
+    const preSelectedIds = (wo && wo.techIds && wo.techIds.length)
+      ? wo.techIds
+      : (wo && wo.techId ? [wo.techId] : []);
     WO.technicians.filter(t => t.status === 'Active').forEach(t => {
-      const isChecked = wo && wo.techId === t.id;
+      const isChecked = preSelectedIds.includes(t.id);
       const div = document.createElement('label');
       div.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 10px;
         border-radius:7px;cursor:pointer;transition:background .12s;
@@ -3342,8 +3329,8 @@ function openNoteModal(woId, action) {
         </div>`;
       cbWrap.appendChild(div);
     });
-    // Set hidden input jika ada default
-    if (wo && wo.techId) document.getElementById('note-tech-id').value = wo.techId;
+    // Set hidden input dari default (CSV)
+    document.getElementById('note-tech-id').value = preSelectedIds.join(',');
 
     // Auto-calculate duration on time change (use onchange to avoid stacking listeners)
     ['note-start-day','note-start-time','note-end-day','note-end-time'].forEach(id => {
@@ -3405,14 +3392,14 @@ function confirmAction() {
     const endDayV    = document.getElementById('note-end-day').value;
     const endTimeV   = document.getElementById('note-end-time').value;
     const durationV  = parseFloat(document.getElementById('note-duration').value) || 0;
-    const techIdV    = document.getElementById('note-tech-id').value;
+    const techIdsV   = (document.getElementById('note-tech-id').value || '').split(',').filter(Boolean);
 
     const missing = [];
     if (!startDayV)  missing.push('Tanggal Mulai');
     if (!startTimeV) missing.push('Jam Mulai');
     if (!endDayV)     missing.push('Tanggal Selesai');
     if (!endTimeV)    missing.push('Jam Selesai');
-    if (!techIdV)     missing.push('Teknisi yang Menangani');
+    if (!techIdsV.length) missing.push('Teknisi yang Menangani');
     if (durationV <= 0) missing.push('Durasi Aktual');
 
     if (missing.length) {
@@ -3451,19 +3438,18 @@ function confirmAction() {
 
   if (action === 'done') {
     const duration = parseFloat(document.getElementById('note-duration').value) || 0;
-    const techId   = document.getElementById('note-tech-id').value;
+    const techIds  = (document.getElementById('note-tech-id').value || '').split(',').filter(Boolean);
     const startDay = document.getElementById('note-start-day').value;
     const startTime= document.getElementById('note-start-time').value;
     const endDay   = document.getElementById('note-end-day').value;
     const endTime  = document.getElementById('note-end-time').value;
 
     wo.actualHours = duration;
-    if (techId) {
-      const oldTech = wo.techId;
-      wo.techId = techId;
-      if (oldTech !== techId) {
-        addAudit(wo, 'status', `Teknisi yang menangani: ${getTechName(techId)}`);
-      }
+    if (techIds.length) {
+      wo.techIds = techIds;
+      wo.techId  = techIds[0]; // primary, untuk kompatibilitas tampilan lama
+      const names = techIds.map(id => getTechName(id)).filter(Boolean).join(', ');
+      addAudit(wo, 'status', `Teknisi yang menangani: ${names}`);
     }
     if (startDay && startTime) wo.startTime = `${fmtDate(startDay)} ${startTime}`;
     if (endDay   && endTime)   wo.endTime   = `${fmtDate(endDay)} ${endTime}`;
@@ -4353,6 +4339,7 @@ function normalizeWOFromSheets(w) {
     equipId:       t(w.equipId),
     techId:        t(w.techId),
     techName:      t(w.techName),
+    techIds:       t(w.techIds) ? t(w.techIds).split(',').filter(Boolean) : (t(w.techId) ? [t(w.techId)] : []),
     unitId:        t(w.unitId),
     areaId:        t(w.areaId),
     requestorName: t(w.requestorName),
@@ -4391,6 +4378,8 @@ function woToRow(wo) {
     equipId:        wo.equipId       || '',
     techId:         wo.techId        || '',
     techName:       getTechName(wo.techId) || '',
+    techIds:        (wo.techIds||[]).join(','),
+    techNames:      getTechNamesStr(wo),
     unitId:         wo.unitId        || '',
     areaId:         wo.areaId        || '',
     requestorName:  wo.requestorName || '',
@@ -4461,6 +4450,11 @@ function getAreaName(areaId) {
 function getTechName(techId) {
   if (!techId) return '';
   return WO.technicians.find(x => x.id === techId)?.name || techId;
+}
+function getTechNamesStr(wo) {
+  if (!wo) return '';
+  const ids = (wo.techIds && wo.techIds.length) ? wo.techIds : (wo.techId ? [wo.techId] : []);
+  return ids.map(id => getTechName(id)).filter(Boolean).join(', ');
 }
 function badgeStatus(status) {
   const m = {Draft:'b-draft',Open:'b-open',Assigned:'b-assigned','In Progress':'b-inprogress',Done:'b-done',Cancelled:'b-cancelled'};
