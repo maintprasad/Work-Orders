@@ -797,7 +797,8 @@ body.simple-mode-admin .sidebar{display:flex!important}
   .sidebar{position:fixed;left:0;top:54px;bottom:0;z-index:400;
     transform:translateX(-100%);width:230px;transition:transform .25s}
   .sidebar.open{transform:translateX(0)}
-  .ham-btn{display:flex}
+  /* Hamburger topbar disembunyikan — trigger sidebar dipindah ke mobile nav bawah */
+  .ham-btn{display:none}
   .top-nav{display:none}
   .content{padding:12px;padding-bottom:70px}
   /* BUG 1 FIX: tampilkan mobile nav */
@@ -949,7 +950,7 @@ input:checked + .slider:before{transform:translateX(18px)}
   @page{margin:15mm 12mm;size:A4 landscape}
 }
 
-html,body{overscroll-behavior-y:none}
+html,body{overscroll-behavior-y:none;touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -1099,6 +1100,11 @@ html,body{overscroll-behavior-y:none}
       <div class="stat-val" id="s-open"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></div>
     </div>
   </div>
+
+  <div class="sec-hdr" style="margin-bottom:14px">
+    <div class="sec-title" style="font-size:15px">WO per Unit</div>
+  </div>
+  <div class="stat-grid" id="dash-unit-cards" style="margin-bottom:24px"></div>
 
   <div class="sec-hdr" style="margin-bottom:14px">
     <div class="sec-title" style="font-size:15px">WO Terbaru</div>
@@ -1525,6 +1531,7 @@ _Terima kasih. WO telah ditutup._</div>
 <!-- ═══════════ MOBILE NAV ═══════════ -->
 <nav class="mobile-nav">
   <div class="mobile-nav-inner">
+    <button class="mnav-btn" onclick="toggleSidebar()"><span class="mnav-ico">☰</span>Menu</button>
     <button class="mnav-btn" id="mnav-home" onclick="navigateTo('wo-list')"><span class="mnav-ico">🏠</span>Home</button>
 <button class="mnav-btn" onclick="navigateTo('comparison')"><span class="mnav-ico">📊</span>Comparison</button>
     <button class="mnav-btn" onclick="openModal('wo',null)"><span class="mnav-ico">＋</span>Submit WO</button>
@@ -2064,6 +2071,22 @@ _Terima kasih. WO telah ditutup._</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
+// MOBILE ZOOM LOCK — blokir pinch-zoom & double-tap zoom di HP
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+let _lastTouchEnd = 0;
+document.addEventListener('touchend', function(e) {
+  const now = Date.now();
+  if (now - _lastTouchEnd <= 300) e.preventDefault();
+  _lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('touchmove', function(e) {
+  if (e.touches && e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
+// ═══════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
@@ -2415,12 +2438,65 @@ function renderDashboard() {
   setText('s-done-rate',  rate + '% completion rate');
   setText('s-open',       all.filter(w => w.status === 'Open').length);
 
+  renderDashboardUnitCards(all);
+
   const recent = [...all].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
   const el = document.getElementById('dash-recent-wo');
   if (!recent.length) { el.innerHTML = emptyState('📋', 'Belum ada Work Order'); return; }
   el.innerHTML = `<div class="tbl-wrap"><table class="data-table"><thead><tr>
-    <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Teknisi</th><th>Status</th><th>Due</th>
+    <th>WO ID</th><th>Judul</th><th>Requestor</th><th>Tipe</th><th>Prioritas</th><th>Status</th><th>Due</th>
   </tr></thead><tbody>${recent.map(w => woTableRow(w, false)).join('')}</tbody></table></div>`;
+}
+
+// ── Kartu ringkasan WO per Unit di Dashboard ──
+function findUnitIdByKeyword(keyword) {
+  const u = (EQUIP_DB.units || []).find(x => {
+    const n = (x.name || '').toLowerCase();
+    return keyword === 'unit1'
+      ? (n.includes('unit 1') || n.includes('unit1') || (n.includes('unit') && n.includes('1') && !n.includes('2')))
+      : (n.includes('unit 2') || n.includes('unit2') || (n.includes('unit') && n.includes('2') && !n.includes('1')));
+  });
+  return u ? u.id : null;
+}
+
+function renderDashboardUnitCards(all) {
+  const wrap = document.getElementById('dash-unit-cards');
+  if (!wrap) return;
+
+  const u1Id = findUnitIdByKeyword('unit1');
+  const u2Id = findUnitIdByKeyword('unit2');
+
+  function statsFor(uid) {
+    const list = uid ? all.filter(w => w.unitId === uid) : [];
+    const done = list.filter(w => w.status === 'Done').length;
+    const open = list.filter(w => w.status === 'Open').length;
+    const rate = list.length ? Math.round(done / list.length * 100) : 0;
+    return { total: list.length, done, open, rate };
+  }
+  const s1 = statsFor(u1Id);
+  const s2 = statsFor(u2Id);
+  const u1Name = u1Id ? getUnitName(u1Id) : 'Unit 1';
+  const u2Name = u2Id ? getUnitName(u2Id) : 'Unit 2';
+
+  wrap.innerHTML = `
+    <div class="stat-card c-teal" onclick="filterByUnitDashboard('${u1Id||''}')">
+      <div class="stat-lbl">🏭 ${esc(u1Name)}</div>
+      <div class="stat-val">${s1.total}</div>
+      <div class="stat-sub">${s1.done} selesai · ${s1.open} open · ${s1.total ? s1.rate+'%' : '—'} rate</div>
+    </div>
+    <div class="stat-card c-purple" onclick="filterByUnitDashboard('${u2Id||''}')">
+      <div class="stat-lbl">🏗 ${esc(u2Name)}</div>
+      <div class="stat-val">${s2.total}</div>
+      <div class="stat-sub">${s2.done} selesai · ${s2.open} open · ${s2.total ? s2.rate+'%' : '—'} rate</div>
+    </div>`;
+}
+
+function filterByUnitDashboard(unitId) {
+  if (!unitId) { toast('Data unit belum tersedia', 'error'); return; }
+  ST.filterUnit = unitId; ST.filterStatus = ''; ST.filterType = ''; ST.filterPriority = '';
+  navigateTo('wo-list');
+  const el = document.getElementById('filterUnit'); if (el) el.value = unitId;
+  renderWOList();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2593,13 +2669,18 @@ function woTableRow(w, showActions = false) {
   // Encode WO ID ke base64 untuk data attribute — hindari masalah karakter / ' "
   const woIdB64 = btoa(unescape(encodeURIComponent(w.id)));
 
+  // Judul: wrap penuh di Dashboard (showActions=false), ellipsis 1 baris di WO List (showActions=true)
+  const titleStyle = showActions
+    ? 'font-weight:500;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+    : 'font-weight:500;white-space:normal;word-break:break-word;line-height:1.4';
+
   return `<tr class="wo-row" data-woid-b64="${woIdB64}" style="cursor:pointer;${rowBg}">
     <td>
       <div style="font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap">${fmtDate(w.createdAt)}</div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);margin-top:2px">${esc(w.id)}</div>
     </td>
     <td>
-      <div style="font-weight:500;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(w.title)}</div>
+      <div style="${titleStyle}">${esc(w.title)}</div>
       ${totalCount ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">✓ ${doneCount}/${totalCount} tasks</div>` : ''}
     </td>
     <td>
@@ -2610,8 +2691,8 @@ function woTableRow(w, showActions = false) {
     <td>${badgePriority(w.priority)}</td>
     ${showActions ? `
     <td><span style="font-size:12px;color:var(--text2)">${esc(equip||'—')}</span></td>
-    <td><span class="td-mono" style="font-size:10px">${esc(w.unitId ? getUnitName(w.unitId) : '—')}</span></td>` : ''}
-    <td><span style="font-size:12px;color:var(--text2)">${esc(tech||'—')}</span></td>
+    <td><span class="td-mono" style="font-size:10px">${esc(w.unitId ? getUnitName(w.unitId) : '—')}</span></td>
+    <td><span style="font-size:12px;color:var(--text2)">${esc(tech||'—')}</span></td>` : ''}
     <td>${badgeStatus(w.status)}</td>
     <td>${dueLabelHtml(w.dueDate, w.status)}</td>
     ${showActions ? `<td class="td-stopclick"><div class="tbl-actions">
@@ -6081,41 +6162,55 @@ function executePrint() {
     </table>`;
 
   // ── Tabel Detail WO ──
-  // Helper: pisahkan "16 Jun 2026 14:30" jadi { tgl:"16 Jun 2026", jam:"14:30" }
+  // Helper: ambil bagian tanggal saja dari "16 Jun 2026 14:30"
   function splitDateTime(val) {
     if (!val) return { tgl: '—', jam: '—' };
     const parts = String(val).trim().split(' ');
     if (parts.length >= 4) {
-      // format: "16 Jun 2026 14:30" → 3 token tanggal + 1 token jam
       const jam = parts.pop();
       return { tgl: parts.join(' '), jam: jam || '—' };
     }
     return { tgl: val, jam: '—' };
   }
 
+  // Helper: label status overdue WO
+  function computeOverdueLabel(w) {
+    if (!w.dueDate || w.status === 'Done' || w.status === 'Cancelled') return '—';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due   = new Date(w.dueDate); due.setHours(0,0,0,0);
+    const diff  = Math.round((due - today) / 86400000);
+    if (diff < 0)   return `Overdue ${Math.abs(diff)} hari`;
+    if (diff === 0) return 'Jatuh tempo hari ini';
+    return 'Belum jatuh tempo';
+  }
+
   const tableRows = filtered.map((w, i) => {
-    const clDone  = (w.checklist||[]).filter(c=>c.done).length;
-    const clTotal = (w.checklist||[]).length;
     const start = splitDateTime(w.startTime); // dari proses "Tandai Selesai"
     const end   = splitDateTime(w.endTime);   // dari proses "Tandai Selesai"
+    const overdueLbl   = computeOverdueLabel(w);
+    const overdueColor = overdueLbl.startsWith('Overdue') ? '#c0392b' : overdueLbl==='Jatuh tempo hari ini' ? '#fb8c3a' : '#888';
     const notesCell = optNotes
       ? `<td style="max-width:100pt;font-size:7.5pt;color:#555">${esc((w.notes||w.closingNote||'—').substring(0,80))}</td>`
       : '';
     return `<tr>
-      <td style="max-width:150pt">
+      <td style="text-align:center;font-size:7.5pt;color:#555">${i+1}</td>
+      <td style="max-width:140pt">
         <div style="font-family:monospace;font-size:7pt;color:#1a3a6b;font-weight:600">${esc(w.id)}</div>
         <div style="font-weight:500">${esc(w.title)}</div>
-        <div style="font-size:7pt;color:#666;margin-top:2pt">${esc(w.requestorName||'')}${w.requestorDept?' · '+esc(w.requestorDept):''}</div>
       </td>
+      <td style="font-size:7.5pt">${esc(w.requestorName||'—')}${w.requestorDept?'<br><span style="font-size:7pt;color:#888">'+esc(w.requestorDept)+'</span>':''}</td>
       <td style="white-space:nowrap"><span class="pb ${priBadgeClass(w.priority)}">${w.priority}</span></td>
       <td><span class="pb ${statusBadgeClass(w.status)}">${w.status}</span></td>
-      <td style="font-size:7.5pt">${esc(w.type||'—')}</td>
+      <td style="font-size:7.5pt;white-space:nowrap">${fmtDate(w.createdAt)}</td>
+      <td style="font-size:7.5pt;white-space:nowrap">${w.dueDate ? fmtDate(w.dueDate) : '—'}</td>
+      <td style="font-size:7.5pt">${esc(w.unitId ? getUnitName(w.unitId) : '—')}</td>
+      <td style="font-size:7.5pt">${esc(w.areaId ? getAreaName(w.areaId) : '—')}</td>
+      <td style="font-size:7.5pt">${esc(getEquipName(w.equipId)||'—')}</td>
+      <td style="font-size:7.5pt">${esc(getTechNamesStr(w)||'—')}</td>
       <td style="font-size:7.5pt;white-space:nowrap">${esc(start.tgl)}</td>
-      <td style="font-size:7.5pt;white-space:nowrap;text-align:center">${esc(start.jam)}</td>
       <td style="font-size:7.5pt;white-space:nowrap">${esc(end.tgl)}</td>
-      <td style="font-size:7.5pt;white-space:nowrap;text-align:center">${esc(end.jam)}</td>
-      <td style="font-size:7.5pt;text-align:center">${clTotal ? clDone+'/'+clTotal : '—'}</td>
       <td style="font-size:7.5pt;white-space:nowrap;font-weight:600;color:#2a7a5a">${w.actualHours ? w.actualHours+' jam' : '—'}</td>
+      <td style="font-size:7.5pt;white-space:nowrap;color:${overdueColor};font-weight:${overdueLbl.startsWith('Overdue')?'700':'400'}">${esc(overdueLbl)}</td>
       ${optNotes ? notesCell : ''}
     </tr>`;
   }).join('');
@@ -6125,9 +6220,9 @@ function executePrint() {
     <table class="print-table">
       <thead>
         <tr>
-          <th>Judul / Requestor</th><th>Prioritas</th><th>Status</th><th>Tipe</th>
-          <th>Dikerjakan Tgl</th><th>Mulai Jam</th><th>Selesai Tgl</th><th>Selesai Jam</th>
-          <th>Checklist</th><th>Durasi</th>
+          <th>No</th><th>Judul / Deskripsi</th><th>Requestor</th><th>Prioritas</th><th>Status</th>
+          <th>Dibuat</th><th>Target</th><th>Unit</th><th>Area</th><th>Equipment</th><th>Teknisi</th>
+          <th>Tgl Dikerjakan</th><th>Tgl Diselesaikan</th><th>Durasi</th><th>Overdue</th>
           ${optNotes ? '<th>Catatan</th>' : ''}
         </tr>
       </thead>
@@ -6395,13 +6490,13 @@ async function exportPrintExcel() {
 
     // ── Tabel Detail WO ──
     if (optTable) {
-      sheet.mergeCells(`A${r}:J${r}`);
+      sheet.mergeCells(`A${r}:O${r}`);
       sheet.getCell(`A${r}`).value = 'DETAIL WORK ORDER';
       sheet.getCell(`A${r}`).font  = { bold: true, size: 10, color: { argb: NAVY } };
       sheet.getCell(`A${r}`).border = { bottom: { style: 'thin', color: { argb: GREEN } } };
       r++;
 
-      const headers = ['Judul / Requestor','Prioritas','Status','Tipe','Dikerjakan Tgl','Mulai Jam','Selesai Tgl','Selesai Jam','Checklist','Durasi'];
+      const headers = ['No','Judul / Deskripsi','Requestor','Prioritas','Status','Dibuat','Target','Unit','Area','Equipment','Teknisi','Tgl Dikerjakan','Tgl Diselesaikan','Durasi','Overdue'];
       if (optNotes) headers.push('Catatan');
       const headerRow = sheet.getRow(r);
       headers.forEach((h, i) => {
@@ -6420,19 +6515,35 @@ async function exportPrintExcel() {
         return { tgl: val, jam: '—' };
       }
 
+      function computeOverdueLabelExcel(w) {
+        if (!w.dueDate || w.status === 'Done' || w.status === 'Cancelled') return '—';
+        const today = new Date(); today.setHours(0,0,0,0);
+        const due   = new Date(w.dueDate); due.setHours(0,0,0,0);
+        const diff  = Math.round((due - today) / 86400000);
+        if (diff < 0)   return `Overdue ${Math.abs(diff)} hari`;
+        if (diff === 0) return 'Jatuh tempo hari ini';
+        return 'Belum jatuh tempo';
+      }
+
       filtered.forEach((w, idx) => {
-        const clDone  = (w.checklist||[]).filter(c=>c.done).length;
-        const clTotal = (w.checklist||[]).length;
         const start = splitDT(w.startTime);
         const end   = splitDT(w.endTime);
         const rowVals = [
-          `${w.id} — ${w.title}${w.requestorName ? '\n'+w.requestorName+(w.requestorDept?' · '+w.requestorDept:'') : ''}`,
+          idx + 1,
+          `${w.id} — ${w.title}`,
+          `${w.requestorName||'—'}${w.requestorDept?' · '+w.requestorDept:''}`,
           w.priority || '—',
           w.status || '—',
-          w.type || '—',
-          start.tgl, start.jam, end.tgl, end.jam,
-          clTotal ? `${clDone}/${clTotal}` : '—',
+          fmtDate(w.createdAt),
+          w.dueDate ? fmtDate(w.dueDate) : '—',
+          w.unitId ? getUnitName(w.unitId) : '—',
+          w.areaId ? getAreaName(w.areaId) : '—',
+          getEquipName(w.equipId) || '—',
+          getTechNamesStr(w) || '—',
+          start.tgl,
+          end.tgl,
           w.actualHours ? `${w.actualHours} jam` : '—',
+          computeOverdueLabelExcel(w),
         ];
         if (optNotes) rowVals.push((w.notes || w.closingNote || '—').substring(0, 200));
 
@@ -6468,13 +6579,22 @@ async function exportPrintExcel() {
 
     // ── Lebar kolom tabel ──
     if (optTable) {
-      sheet.getColumn('A').width = 38;
-      ['B','C','D'].forEach(c => sheet.getColumn(c).width = 14);
-      ['E','G'].forEach(c => sheet.getColumn(c).width = 13);
-      ['F','H'].forEach(c => sheet.getColumn(c).width = 9);
-      sheet.getColumn('I').width = 10;
-      sheet.getColumn('J').width = 10;
-      if (optNotes) sheet.getColumn('K').width = 30;
+      sheet.getColumn('A').width = 6;   // No
+      sheet.getColumn('B').width = 36;  // Judul / Deskripsi
+      sheet.getColumn('C').width = 18;  // Requestor
+      sheet.getColumn('D').width = 11;  // Prioritas
+      sheet.getColumn('E').width = 12;  // Status
+      sheet.getColumn('F').width = 12;  // Dibuat
+      sheet.getColumn('G').width = 12;  // Target
+      sheet.getColumn('H').width = 12;  // Unit
+      sheet.getColumn('I').width = 14;  // Area
+      sheet.getColumn('J').width = 16;  // Equipment
+      sheet.getColumn('K').width = 16;  // Teknisi
+      sheet.getColumn('L').width = 13;  // Tgl Dikerjakan
+      sheet.getColumn('M').width = 13;  // Tgl Diselesaikan
+      sheet.getColumn('N').width = 10;  // Durasi
+      sheet.getColumn('O').width = 16;  // Overdue
+      if (optNotes) sheet.getColumn('P').width = 30;
     }
 
     // ── Trigger download ──
