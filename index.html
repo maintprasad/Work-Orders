@@ -1055,6 +1055,7 @@ html,body{overscroll-behavior-y:none;touch-action:manipulation}
     <div class="sb-item" data-page="admin-panel"><span class="sb-icon">⚙</span>Admin Panel</div>
     <div class="sb-item" data-page="dashboard"><span class="sb-icon">◈</span>Dashboard</div>
     <div class="sb-item" data-page="technicians"><span class="sb-icon">👷</span>Teknisi</div>
+    <div class="sb-item" data-page="equip-history-admin"><span class="sb-icon">🔧</span>Equip. History</div>
     </div>
 
   <!-- STATUS FILTER — Maintenance + Admin -->
@@ -1262,6 +1263,14 @@ html,body{overscroll-behavior-y:none;touch-action:manipulation}
         <div class="rac-desc">Atur pengiriman notifikasi otomatis via WhatsApp Bot</div>
       </div>
       <div class="rac-btns"><button class="btn-ghost" onclick="event.stopPropagation();navigateTo('notif-settings')">Buka →</button></div>
+    </div>
+    <div class="report-action-card" onclick="navigateTo('equip-history-admin')">
+      <div class="rac-ico">🔧</div>
+      <div class="rac-info">
+        <div class="rac-title">Equipment History</div>
+        <div class="rac-desc">Riwayat perbaikan per equipment, per area, per unit — download Excel</div>
+      </div>
+      <div class="rac-btns"><button class="btn-ghost" onclick="event.stopPropagation();navigateTo('equip-history-admin')">Buka →</button></div>
     </div>
   </div>
 
@@ -1523,6 +1532,61 @@ _Terima kasih. WO telah ditutup._</div>
 <!-- ─── PAGE: PRINT PREVIEW (hidden, only visible @print) ─── -->
 <div class="page" id="page-print-preview">
   <div id="print-doc-container"></div>
+</div>
+
+<!-- ─── PAGE: EQUIPMENT HISTORY ADMIN ─── -->
+<div class="page" id="page-equip-history-admin">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">🔧 Equipment History <span class="admin-badge">ADMIN</span></div>
+      <div class="sec-sub">Riwayat perbaikan per equipment — filter unit & area</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="toolbar" style="margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <select class="fsel" id="eha-unit" onchange="onEHAUnitChange()" style="min-width:130px">
+      <option value="">Semua Unit</option>
+    </select>
+    <select class="fsel" id="eha-area" onchange="renderEHAPage()" style="min-width:130px">
+      <option value="">Semua Area</option>
+    </select>
+    <select class="fsel" id="eha-equip" onchange="renderEHAPage()" style="min-width:160px">
+      <option value="">Semua Equipment</option>
+    </select>
+    <div class="search-wrap" style="max-width:240px">
+      <span style="color:var(--text3);font-size:13px">⌕</span>
+      <input type="text" id="eha-search" placeholder="Cari aktivitas, parts, teknisi..." oninput="renderEHAPage()"/>
+    </div>
+    <button class="btn-ghost" onclick="resetEHAFilter()" id="eha-reset-btn" style="display:none">✕ Reset</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="stat-grid" style="margin-bottom:20px" id="eha-stat-grid">
+    <div class="stat-card c-blue">
+      <div class="stat-lbl">Total Equipment</div>
+      <div class="stat-val" id="eha-total-equip">—</div>
+      <div class="stat-sub">punya history WO</div>
+    </div>
+    <div class="stat-card c-green">
+      <div class="stat-lbl">Total Perbaikan</div>
+      <div class="stat-val" id="eha-total-repairs">—</div>
+      <div class="stat-sub">WO Done dengan equipment</div>
+    </div>
+    <div class="stat-card c-orange">
+      <div class="stat-lbl">Total Parts Diganti</div>
+      <div class="stat-val" id="eha-total-parts">—</div>
+      <div class="stat-sub">item spare part</div>
+    </div>
+    <div class="stat-card c-teal">
+      <div class="stat-lbl">Avg Durasi</div>
+      <div class="stat-val" id="eha-avg-hours">—</div>
+      <div class="stat-sub">jam per perbaikan</div>
+    </div>
+  </div>
+
+  <!-- Equipment list dengan accordion -->
+  <div id="eha-equip-list"></div>
 </div>
 
 </main>
@@ -2393,6 +2457,7 @@ function navigateTo(page) {
   if (page === 'admin-panel')      renderAdminPanel();
   if (page === 'user-management')  renderUserManagement();
   if (page === 'notif-settings')   renderNotifSettings();
+  if (page === 'equip-history-admin') renderEHAPage();
 }
 
 function refreshAll() {
@@ -5117,12 +5182,513 @@ function getVisibleWO() {
 // ═══════════════════════════════════════════════════════════════
 
 function renderAdminPanel() {
-  // Hanya refresh stat cards kecil jika diperlukan — page sudah static HTML
-  // Update button state berdasarkan data
   const btn = document.getElementById('btn-gen-ppt');
   if (btn) {
     const total = WO.workorders.length;
     btn.title = `Generate PPT dari ${total} Work Order`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EQUIPMENT HISTORY ADMIN PAGE
+// ═══════════════════════════════════════════════════════════════
+
+function getEHABaseData() {
+  // Kumpulkan semua WO Done yang punya equipId
+  return WO.workorders.filter(w => w.status === 'Done' && w.equipId);
+}
+
+function onEHAUnitChange() {
+  const unitId  = document.getElementById('eha-unit')?.value || '';
+  const areaSel = document.getElementById('eha-area');
+  const eqSel   = document.getElementById('eha-equip');
+  if (areaSel) {
+    areaSel.innerHTML = '<option value="">Semua Area</option>';
+    const areas = unitId
+      ? (EQUIP_DB.areas || []).filter(a => a.unitId === unitId)
+      : (EQUIP_DB.areas || []);
+    areas.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id; opt.textContent = a.name;
+      areaSel.appendChild(opt);
+    });
+  }
+  if (eqSel) {
+    eqSel.innerHTML = '<option value="">Semua Equipment</option>';
+    const eqs = unitId
+      ? (EQUIP_DB.equipment || []).filter(e => e.unitId === unitId)
+      : (EQUIP_DB.equipment || []);
+    eqs.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id; opt.textContent = e.name;
+      eqSel.appendChild(opt);
+    });
+  }
+  renderEHAPage();
+}
+
+function resetEHAFilter() {
+  ['eha-unit','eha-area','eha-equip'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const s = document.getElementById('eha-search');
+  if (s) s.value = '';
+  onEHAUnitChange();
+  renderEHAPage();
+}
+
+function renderEHAPage() {
+  // Populate filter dropdowns (unit)
+  const unitSel = document.getElementById('eha-unit');
+  if (unitSel && unitSel.children.length <= 1) {
+    (EQUIP_DB.units || []).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.textContent = u.name;
+      unitSel.appendChild(opt);
+    });
+  }
+
+  const fUnit  = document.getElementById('eha-unit')?.value  || '';
+  const fArea  = document.getElementById('eha-area')?.value  || '';
+  const fEquip = document.getElementById('eha-equip')?.value || '';
+  const fQ     = (document.getElementById('eha-search')?.value || '').toLowerCase();
+  const hasFilter = fUnit || fArea || fEquip || fQ;
+
+  const resetBtn = document.getElementById('eha-reset-btn');
+  if (resetBtn) resetBtn.style.display = hasFilter ? '' : 'none';
+
+  // Filter WO base
+  let baseWOs = getEHABaseData();
+
+  if (fUnit) {
+    const areaIds = (EQUIP_DB.areas || []).filter(a => a.unitId === fUnit).map(a => a.id);
+    const eqIds   = (EQUIP_DB.equipment || []).filter(e => e.unitId === fUnit).map(e => e.id);
+    baseWOs = baseWOs.filter(w => eqIds.includes(w.equipId));
+  }
+  if (fArea) {
+    const eqIds = (EQUIP_DB.equipment || []).filter(e => e.areaId === fArea).map(e => e.id);
+    baseWOs = baseWOs.filter(w => eqIds.includes(w.equipId));
+  }
+  if (fEquip) {
+    baseWOs = baseWOs.filter(w => w.equipId === fEquip);
+  }
+  if (fQ) {
+    baseWOs = baseWOs.filter(w => {
+      const tech   = getTechNamesStr(w).toLowerCase();
+      const title  = (w.title || '').toLowerCase();
+      const parts  = (w.partsUsed || []).map(p => p.name).join(' ').toLowerCase();
+      const equip  = getEquipName(w.equipId).toLowerCase();
+      return tech.includes(fQ) || title.includes(fQ) || parts.includes(fQ) || equip.includes(fQ);
+    });
+  }
+
+  // Group by equipId
+  const equipMap = {};
+  baseWOs.forEach(w => {
+    if (!equipMap[w.equipId]) {
+      const eq     = (EQUIP_DB.equipment || []).find(e => e.id === w.equipId);
+      const area   = (EQUIP_DB.areas     || []).find(a => a.id === (eq?.areaId || w.areaId));
+      const unit   = (EQUIP_DB.units     || []).find(u => u.id === (eq?.unitId || w.unitId));
+      equipMap[w.equipId] = {
+        equipId:   w.equipId,
+        equipName: getEquipName(w.equipId) || w.equipId,
+        areaName:  area?.name  || getAreaName(w.areaId) || '—',
+        unitName:  unit?.name  || getUnitName(w.unitId) || '—',
+        wos: [],
+      };
+    }
+    equipMap[w.equipId].wos.push(w);
+  });
+
+  const equipList = Object.values(equipMap).sort((a, b) => {
+    // Sort by unit → area → equipName
+    const uCmp = a.unitName.localeCompare(b.unitName);
+    if (uCmp !== 0) return uCmp;
+    const aCmp = a.areaName.localeCompare(b.areaName);
+    if (aCmp !== 0) return aCmp;
+    return a.equipName.localeCompare(b.equipName);
+  });
+
+  // Update stat cards
+  const totalEquip  = equipList.length;
+  const totalRepair = baseWOs.length;
+  const totalParts  = baseWOs.reduce((s, w) => s + (w.partsUsed||[]).reduce((ps,p) => ps+(p.qty||0), 0), 0);
+  const hoursArr    = baseWOs.filter(w => parseFloat(w.actualHours) > 0).map(w => parseFloat(w.actualHours));
+  const avgHours    = hoursArr.length ? (hoursArr.reduce((a,b) => a+b, 0) / hoursArr.length).toFixed(1) + ' jam' : '—';
+
+  setText('eha-total-equip',   totalEquip);
+  setText('eha-total-repairs', totalRepair);
+  setText('eha-total-parts',   totalParts);
+  setText('eha-avg-hours',     avgHours);
+
+  // Render list
+  const container = document.getElementById('eha-equip-list');
+  if (!container) return;
+
+  if (!equipList.length) {
+    container.innerHTML = `<div class="empty">
+      <div class="empty-ico">🔧</div>
+      <div class="empty-msg">${hasFilter ? 'Tidak ada equipment history yang cocok dengan filter' : 'Belum ada equipment yang memiliki history perbaikan'}</div>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = equipList.map((eq, idx) => {
+    const repCount   = eq.wos.length;
+    const lastRepair = eq.wos.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    const totalPartsEq = eq.wos.reduce((s,w) => s+(w.partsUsed||[]).reduce((ps,p)=>ps+(p.qty||0),0), 0);
+    const hoursEq    = eq.wos.filter(w => parseFloat(w.actualHours)>0).map(w=>parseFloat(w.actualHours));
+    const avgHoursEq = hoursEq.length ? (hoursEq.reduce((a,b)=>a+b,0)/hoursEq.length).toFixed(1)+' jam' : '—';
+
+    const tableRows = eq.wos
+      .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((w, i) => {
+        const techNames = getTechNamesStr(w) || '—';
+        const partsStr  = (w.partsUsed || []).length
+          ? (w.partsUsed || []).map(p => `${esc(p.name)} ×${p.qty}`).join(', ')
+          : '—';
+        const activity  = w.title || '—';
+        const closingNote = w.closingNote ? `<div style="font-size:10px;color:var(--text3);margin-top:2px;font-style:italic">"${esc(w.closingNote.substring(0,80))}"</div>` : '';
+        return `<tr style="${i%2===0?'background:var(--bg3)':'background:var(--bg2)'}">
+          <td style="text-align:center;font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">${i+1}</td>
+          <td>
+            <div style="font-size:12px;font-weight:600;color:var(--navy)">${fmtDate(w.createdAt)}</div>
+            ${w.endTime ? `<div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:2px">✓ ${esc(w.endTime)}</div>` : ''}
+          </td>
+          <td>
+            <div style="font-size:12px;font-weight:500">${esc(activity)}</div>
+            <div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">${badgeType(w.type)}</div>
+            ${closingNote}
+          </td>
+          <td>
+            <div style="font-size:12px;color:${(w.partsUsed||[]).length?'var(--text)':'var(--text3)'}">${partsStr}</div>
+            ${(w.partsUsed||[]).length ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${(w.partsUsed||[]).length} item</div>` : ''}
+          </td>
+          <td>
+            <div style="font-size:12px;font-weight:500;color:var(--navy)">${esc(techNames)}</div>
+            ${w.actualHours ? `<div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--teal);margin-top:2px">⏱ ${w.actualHours} jam</div>` : ''}
+          </td>
+          <td>
+            <div style="display:flex;gap:4px;align-items:center">
+              <a href="#" onclick="event.preventDefault();showDetail('${esc(w.id)}')" 
+                style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);font-weight:600;text-decoration:none"
+                title="Lihat detail WO">${esc(w.id)}</a>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+    const eqId = `eha-acc-${idx}`;
+    return `<div class="detail-panel" style="margin-bottom:14px;overflow:hidden">
+      <!-- Header accordion -->
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px"
+        onclick="toggleEHAAccordion('${eqId}')">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex:1;min-width:0">
+          <div style="font-size:24px;flex-shrink:0">⚙</div>
+          <div style="min-width:0">
+            <div style="font-size:15px;font-weight:700;color:var(--navy)">${esc(eq.equipName)}</div>
+            <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:3px">
+              🏭 ${esc(eq.unitName)} &nbsp;›&nbsp; 📍 ${esc(eq.areaName)}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
+          <div style="text-align:center">
+            <div style="font-size:20px;font-weight:700;color:var(--red)">${repCount}</div>
+            <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">PERBAIKAN</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:14px;font-weight:600;color:var(--accent)">${totalPartsEq}</div>
+            <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">PARTS</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:14px;font-weight:600;color:var(--teal)">${avgHoursEq}</div>
+            <div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text3)">AVG DURASI</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn-ghost" style="font-size:11px;padding:5px 10px;white-space:nowrap"
+              onclick="event.stopPropagation();downloadEHAExcel('${esc(eq.equipId)}','${esc(eq.equipName)}','${esc(eq.unitName)}','${esc(eq.areaName)}')"
+              title="Download history equipment ini sebagai Excel">
+              📥 Excel
+            </button>
+            <button class="btn-sm" id="${eqId}-toggle" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px">▼</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabel history -->
+      <div id="${eqId}" style="overflow:hidden;transition:max-height .3s ease">
+        <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-bottom:8px">
+          Terakhir diperbaiki: <strong>${fmtDate(lastRepair.createdAt)}</strong>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" style="min-width:700px">
+            <thead>
+              <tr>
+                <th style="width:40px">No</th>
+                <th>Tanggal Perbaikan</th>
+                <th>Aktivitas / Keluhan</th>
+                <th>Parts yang Diganti</th>
+                <th>PIC Teknisi</th>
+                <th>WO ID</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEHAAccordion(id) {
+  const el  = document.getElementById(id);
+  const btn = document.getElementById(id + '-toggle');
+  if (!el) return;
+  const isOpen = el.style.maxHeight !== '0px' && el.style.maxHeight !== '';
+  if (isOpen) {
+    el.style.maxHeight = '0px';
+    el.style.overflow  = 'hidden';
+    if (btn) btn.textContent = '▶';
+  } else {
+    el.style.maxHeight = el.scrollHeight + 'px';
+    el.style.overflow  = 'visible';
+    if (btn) btn.textContent = '▼';
+  }
+}
+
+async function downloadEHAExcel(equipId, equipName, unitName, areaName) {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+
+  try {
+    // Load ExcelJS dari CDN kalau belum ada
+    if (typeof ExcelJS === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const wos = WO.workorders
+      .filter(w => w.status === 'Done' && w.equipId === equipId)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+    if (!wos.length) {
+      toast('Tidak ada history untuk equipment ini', 'error');
+      return;
+    }
+
+    const nowStr  = new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
+    const nowTime = new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+
+    const wb    = new ExcelJS.Workbook();
+    wb.creator  = SESSION?.nama || 'WO System';
+    wb.created  = new Date();
+    const sheet = wb.addWorksheet('Equipment History', {
+      pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+      views: [{ showGridLines: false }],
+    });
+
+    const NAVY  = 'FF1A3A6B';
+    const GREEN = 'FF4A9E3F';
+    const WHITE = 'FFFFFFFF';
+    const LIGHT = 'FFEEF3EE';
+    const TEXT3 = 'FF7A9A7A';
+    const NAVY2 = 'FF0D2240';
+
+    // ── Lebar kolom ──
+    sheet.getColumn(1).width = 6;   // No
+    sheet.getColumn(2).width = 18;  // Tanggal
+    sheet.getColumn(3).width = 38;  // Aktivitas
+    sheet.getColumn(4).width = 30;  // Parts
+    sheet.getColumn(5).width = 22;  // Teknisi
+    sheet.getColumn(6).width = 14;  // Durasi
+    sheet.getColumn(7).width = 16;  // WO ID
+
+    let r = 1;
+
+    // ── Header dokumen ──
+    sheet.mergeCells(`A${r}:G${r}`);
+    sheet.getCell(`A${r}`).value = 'PT PRASAD SEEDS INDONESIA';
+    sheet.getCell(`A${r}`).font  = { bold:true, size:14, color:{ argb:NAVY } };
+    r++;
+
+    sheet.mergeCells(`A${r}:G${r}`);
+    sheet.getCell(`A${r}`).value = 'Laporan History Perbaikan Equipment — Departemen Maintenance';
+    sheet.getCell(`A${r}`).font  = { italic:true, size:11, color:{ argb:'FF3A5A3A' } };
+    r++;
+
+    sheet.mergeCells(`A${r}:G${r}`);
+    sheet.getCell(`A${r}`).value = `Equipment: ${equipName}  |  Unit: ${unitName}  |  Area: ${areaName}`;
+    sheet.getCell(`A${r}`).font  = { bold:true, size:10, color:{ argb:NAVY } };
+    r++;
+
+    sheet.mergeCells(`A${r}:G${r}`);
+    sheet.getCell(`A${r}`).value = `Dicetak: ${nowStr} ${nowTime}  |  Operator: ${SESSION?.nama||'—'} (${SESSION?.role||'—'})  |  Total Perbaikan: ${wos.length}`;
+    sheet.getCell(`A${r}`).font  = { size:8.5, color:{ argb:TEXT3 } };
+    r += 1;
+
+    // ── Divider ──
+    for (let c = 1; c <= 7; c++) {
+      sheet.getCell(r, c).border = { bottom:{ style:'medium', color:{ argb:GREEN } } };
+    }
+    r++;
+
+    // ── Summary KPI ──
+    const totalPartsCount = wos.reduce((s,w) => s+(w.partsUsed||[]).reduce((ps,p)=>ps+(p.qty||0),0), 0);
+    const hoursArr = wos.filter(w=>parseFloat(w.actualHours)>0).map(w=>parseFloat(w.actualHours));
+    const avgH     = hoursArr.length ? (hoursArr.reduce((a,b)=>a+b,0)/hoursArr.length).toFixed(1) : '—';
+    const totalH   = hoursArr.length ? hoursArr.reduce((a,b)=>a+b,0).toFixed(1) : '—';
+
+    const kpis = [
+      ['Total Perbaikan', wos.length],
+      ['Total Parts Diganti', totalPartsCount],
+      ['Rata-rata Durasi', avgH + ' jam'],
+      ['Total Jam Kerja', totalH + ' jam'],
+    ];
+    kpis.forEach((k, i) => {
+      const col = i + 1;
+      const cellVal = sheet.getCell(r, col);
+      const cellLbl = sheet.getCell(r+1, col);
+      cellVal.value = k[1];
+      cellVal.font  = { bold:true, size:18, color:{ argb:NAVY } };
+      cellVal.alignment = { horizontal:'center' };
+      cellVal.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:LIGHT } };
+      cellLbl.value = k[0];
+      cellLbl.font  = { size:8, color:{ argb:TEXT3 } };
+      cellLbl.alignment = { horizontal:'center' };
+      cellLbl.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:LIGHT } };
+    });
+    // Merge kolom 5-7 jadi catatan
+    sheet.mergeCells(`E${r}:G${r}`);
+    sheet.getCell(`E${r}`).value = `Perbaikan pertama: ${fmtDate(wos[0]?.createdAt)}`;
+    sheet.getCell(`E${r}`).font  = { size:10, color:{ argb:'FF3A5A3A' } };
+    sheet.getCell(`E${r}`).alignment = { horizontal:'center', vertical:'middle' };
+    sheet.getCell(`E${r}`).fill = { type:'pattern', pattern:'solid', fgColor:{ argb:LIGHT } };
+    sheet.mergeCells(`E${r+1}:G${r+1}`);
+    sheet.getCell(`E${r+1}`).value = `Perbaikan terakhir: ${fmtDate(wos[wos.length-1]?.createdAt)}`;
+    sheet.getCell(`E${r+1}`).font  = { size:10, color:{ argb:'FF3A5A3A' } };
+    sheet.getCell(`E${r+1}`).alignment = { horizontal:'center', vertical:'middle' };
+    sheet.getCell(`E${r+1}`).fill = { type:'pattern', pattern:'solid', fgColor:{ argb:LIGHT } };
+    r += 3;
+
+    // ── Header tabel ──
+    const headers = ['No', 'Tanggal Perbaikan', 'Aktivitas yang Dilakukan', 'Parts yang Diganti', 'PIC Teknisi', 'Durasi Aktual', 'WO ID'];
+    const headerRow = sheet.getRow(r);
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.font  = { bold:true, color:{ argb:WHITE }, size:10 };
+      cell.fill  = { type:'pattern', pattern:'solid', fgColor:{ argb:NAVY } };
+      cell.alignment = { vertical:'middle', horizontal:'center', wrapText:true };
+      cell.border = { bottom:{ style:'medium', color:{ argb:GREEN } } };
+    });
+    sheet.getRow(r).height = 24;
+    r++;
+
+    // ── Baris data ──
+    wos.forEach((w, idx) => {
+      const techNames = getTechNamesStr(w) || '—';
+      const partsArr  = (w.partsUsed || []);
+      const partsStr  = partsArr.length
+        ? partsArr.map(p => `${p.name} ×${p.qty}`).join('\n')
+        : '—';
+      const activityStr = w.title + (w.closingNote ? '\n[' + w.closingNote.substring(0,120) + ']' : '');
+      const tanggalStr  = fmtDate(w.createdAt) + (w.endTime ? '\nSelesai: ' + w.endTime : '');
+
+      const row = sheet.getRow(r);
+      const isEven = idx % 2 === 0;
+      const bgColor = isEven ? LIGHT : WHITE;
+
+      const rowData = [
+        idx + 1,
+        tanggalStr,
+        activityStr,
+        partsStr,
+        techNames,
+        w.actualHours ? w.actualHours + ' jam' : '—',
+        w.id,
+      ];
+
+      rowData.forEach((val, ci) => {
+        const cell = row.getCell(ci + 1);
+        cell.value = val;
+        cell.font  = { size:10 };
+        cell.fill  = { type:'pattern', pattern:'solid', fgColor:{ argb:bgColor } };
+        cell.alignment = { wrapText:true, vertical:'top', horizontal: ci===0 ? 'center' : 'left' };
+        cell.border = { bottom:{ style:'hair', color:{ argb:'FFD4E0D4' } } };
+      });
+
+      // Warnai baris jika banyak perbaikan (>= 3 WO = peringatan)
+      if (partsArr.length >= 3) {
+        row.getCell(4).font = { size:10, color:{ argb:'FFC0392B' }, bold:true };
+      }
+
+      // Tinggi baris menyesuaikan konten
+      const lineCount = Math.max(
+        partsArr.length || 1,
+        (activityStr.match(/\n/g)||[]).length + 1,
+        (tanggalStr.match(/\n/g)||[]).length + 1
+      );
+      row.height = Math.max(20, lineCount * 16);
+      r++;
+    });
+
+    // ── Total row ──
+    const totalRow = sheet.getRow(r);
+    sheet.mergeCells(`A${r}:B${r}`);
+    totalRow.getCell(1).value = 'TOTAL';
+    totalRow.getCell(1).font  = { bold:true, color:{ argb:WHITE }, size:10 };
+    totalRow.getCell(1).fill  = { type:'pattern', pattern:'solid', fgColor:{ argb:NAVY2 } };
+    totalRow.getCell(1).alignment = { horizontal:'center' };
+
+    const totalPartsStr = `${totalPartsCount} item spare part dari ${wos.length} perbaikan`;
+    sheet.mergeCells(`D${r}:D${r}`);
+    totalRow.getCell(4).value = totalPartsStr;
+    totalRow.getCell(4).font  = { bold:true, color:{ argb:WHITE }, size:10 };
+    totalRow.getCell(4).fill  = { type:'pattern', pattern:'solid', fgColor:{ argb:NAVY2 } };
+
+    totalRow.getCell(6).value = totalH !== '—' ? totalH + ' jam total' : '—';
+    totalRow.getCell(6).font  = { bold:true, color:{ argb:WHITE }, size:10 };
+    totalRow.getCell(6).fill  = { type:'pattern', pattern:'solid', fgColor:{ argb:NAVY2 } };
+    totalRow.getCell(6).alignment = { horizontal:'center' };
+
+    [1,2,3,4,5,6,7].forEach(ci => {
+      const cell = totalRow.getCell(ci);
+      if (!cell.fill.fgColor) {
+        cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:NAVY2 } };
+      }
+      cell.font = cell.font || {};
+      cell.font.color = { argb:WHITE };
+    });
+    r += 2;
+
+    // ── Footer ──
+    sheet.mergeCells(`A${r}:G${r}`);
+    sheet.getCell(`A${r}`).value = `PT Prasad Seeds Indonesia — Sistem Work Order Maintenance | Dicetak: ${nowStr} ${nowTime} oleh ${SESSION?.nama||'—'}`;
+    sheet.getCell(`A${r}`).font  = { size:7.5, color:{ argb:TEXT3 }, italic:true };
+
+    // ── Trigger download ──
+    const buf  = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type:'application/octet-stream' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    const safeName = equipName.replace(/[^A-Za-z0-9\-_]/g, '_');
+    a.download = `History_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+
+    toast(`✅ Excel history ${equipName} berhasil didownload`, 'success');
+  } catch(e) {
+    console.error('Download EHA Excel error:', e);
+    toast('❌ Gagal download: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 Excel'; }
   }
 }
 
