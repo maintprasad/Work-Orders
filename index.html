@@ -2154,11 +2154,12 @@ document.addEventListener('touchmove', function(e) {
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
-  apiUrl:     'https://script.google.com/macros/s/AKfycbz9qqnGhDVNYN_GtiF0ng-nxKNjiuh-NiQFieMFP4B8H_PAvZ7KZfGjcDleCE84vRy3/exec',
-  equipDbApi: 'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
-  storageKey: 'wo_data_v1',
-  equipDbKey: 'edb_data',
-  itemsDbKey: 'items_db_cache',
+  apiUrl:          'https://script.google.com/macros/s/AKfycbwJ7y6Gsn5Xmb7mQ2-dPy8kL0K6JBK3MV6nL8ajUQiqfFriO-0hPJzoyLmFAxh6iIxx/exec',
+  equipDbApi:      'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
+  secondaryApiUrl: 'https://script.google.com/macros/s/AKfycbwK_SOQKVjEgQuSw5FRHzS4GfUxasGUfu0UpRfEtKxzv2VRU2We4G0wBk0yjd6IEQmhcw/exec', // <-- ISI DENGAN URL GOOGLE APPS SCRIPT KEDUA KAMU
+  storageKey:      'wo_data_v1',
+  equipDbKey:      'edb_data',
+  itemsDbKey:      'items_db_cache',
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -2935,7 +2936,7 @@ function showDetail(woId) {
   if (!wo) return;
   navigateTo('detail');
 
-  const STATUS_FLOW = ['Open', 'Done'];
+  const STATUS_FLOW = ['Open', 'Pending Verification', 'Done'];
   const curIdx = STATUS_FLOW.indexOf(wo.status);
   const pColor = {Critical:'var(--red)',High:'var(--orange)',Medium:'var(--accent)',Low:'var(--text3)'};
 
@@ -2962,8 +2963,24 @@ function showDetail(woId) {
     let primary = '';
     let danger  = '';
     if (s === 'Open' && canClose)
-      primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Done','done')">✅ Tandai Selesai</button>`;
-    if (s !== 'Done' && s !== 'Cancelled' && canClose)
+      primary = `<button class="btn-action-primary" onclick="changeStatus('${woId}','Pending Verification','done')">✅ Tandai Selesai</button>`;
+    if (s === 'Pending Verification') {
+      const isRequestor = SESSION && (SESSION.nama === wo.requestorName || SESSION.userId === wo.createdBy);
+      if (isRequestor) {
+        primary = `<div style="background:rgba(74,158,63,.08);border:1px solid rgba(74,158,63,.25);border-radius:8px;padding:12px 16px;margin-bottom:4px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">⏳ Teknisi telah menyelesaikan WO ini. Silakan verifikasi pekerjaan sebelum menutup.</div>
+          <button class="btn-action-primary" onclick="verifyAndClosWO('${woId}')">✔ Verifikasi & Tutup WO</button>
+        </div>`;
+      } else {
+        primary = `<div style="background:rgba(251,140,58,.07);border:1px solid rgba(251,140,58,.2);border-radius:8px;padding:12px 16px">
+          <div style="font-size:12px;color:#c07020;font-weight:600;margin-bottom:4px">⏳ Menunggu Verifikasi Requestor</div>
+          <div style="font-size:11px;color:var(--text3)">Menunggu konfirmasi dari <strong>${esc(wo.requestorName||'—')}</strong> untuk menutup WO ini.</div>
+        </div>`;
+      }
+    }
+    if (s !== 'Done' && s !== 'Cancelled' && s !== 'Pending Verification' && canClose)
+      danger = `<button class="btn-action-danger" onclick="changeStatus('${woId}','Cancelled','note')">✕ Batalkan WO</button>`;
+    if (s === 'Pending Verification' && canClose)
       danger = `<button class="btn-action-danger" onclick="changeStatus('${woId}','Cancelled','note')">✕ Batalkan WO</button>`;
     if (s === 'Done' || s === 'Cancelled')
       primary = `<span style="font-size:12px;color:var(--text3);font-family:'IBM Plex Mono',monospace;padding:8px 0;display:block">WO telah ${s === 'Done' ? '✅ selesai' : '❌ dibatalkan'}</span>`;
@@ -3607,10 +3624,10 @@ function confirmAction() {
     addAudit(wo, 'note', auditMsg);
 
     if (noteText) wo.closingNote = noteText;
-    changeStatus(woId, 'Done', null);
+    changeStatus(woId, 'Pending Verification', null);
     if (wo.equipId) pushRepairHistory(wo, noteText, duration);
-    // Kirim notifikasi WA selesai
-    sendWANotif('done', wo);
+    // Notif WA bahwa WO sudah selesai dikerjakan, menunggu verifikasi requestor
+    sendWANotif('pending_verify', wo);
 
   } else if (action === 'note') {
     changeStatus(woId, 'In Progress', null);
@@ -3875,11 +3892,27 @@ function deleteTech(id) {
 // ═══════════════════════════════════════════════════════════════
 // STATUS CHANGE
 // ═══════════════════════════════════════════════════════════════
+function verifyAndClosWO(woId) {
+  const wo = WO.workorders.find(w => w.id === woId);
+  if (!wo) return;
+  const isRequestor = SESSION && (SESSION.nama === wo.requestorName || SESSION.userId === wo.createdBy);
+  if (!isRequestor) { toast('Hanya requestor WO yang bisa memverifikasi', 'error'); return; }
+  if (!confirm(`Verifikasi bahwa pekerjaan pada WO "${wo.title}" sudah selesai dan sesuai?`)) return;
+  const old = wo.status;
+  wo.status = 'Done';
+  addAudit(wo, 'status', `Diverifikasi & ditutup oleh requestor: ${SESSION.nama}`);
+  saveLocal(); showDetail(woId); refreshAll();
+  toast('✅ WO telah diverifikasi dan ditutup', 'success');
+  syncUpsertWO(wo);
+  sendWANotif('done', wo);
+  syncToSecondarySheets(wo);
+}
+
 function changeStatus(woId, newStatus, noteType) {
   const wo = WO.workorders.find(w => w.id === woId);
   if (!wo) return;
-  if (newStatus === 'Done'        && noteType === 'done') { openNoteModal(woId, 'done'); return; }
-  if (newStatus === 'Cancelled'   && noteType === 'note') { openNoteModal(woId, 'note'); return; }
+  if (newStatus === 'Pending Verification' && noteType === 'done') { openNoteModal(woId, 'done'); return; }
+  if (newStatus === 'Cancelled'            && noteType === 'note') { openNoteModal(woId, 'note'); return; }
   const old = wo.status;
   wo.status = newStatus;
   addAudit(wo, 'status', `Status ${old} → ${newStatus}`);
@@ -4550,9 +4583,32 @@ function woToRow(wo) {
 }
 
 // Backward-compat stubs (lama dipanggil langsung, sekarang pakai queue)
-function syncUpsertWO(wo)   { queueSyncWO(wo); }
+function syncUpsertWO(wo)   { queueSyncWO(wo); syncToSecondarySheets(wo); }
 function syncDeleteWO(id)   { queueDeleteWO(id); }
 function syncUpsertTech(t)  { queueSyncTech(t); }
+
+// ── SECONDARY SHEETS SYNC ──
+// Mirror data WO ke Google Sheets kedua (read-only dari sisi HTML).
+// Data dari sheets kedua tidak akan dibaca/mempengaruhi tampilan HTML.
+async function syncToSecondarySheets(wo) {
+  if (!CFG.secondaryApiUrl) return; // URL belum diset, skip
+  try {
+    const row = {
+      ...woToRow(wo),
+      syncedAt:    new Date().toISOString(),
+      syncedBy:    SESSION?.nama || '—',
+      syncSource:  'WO_SYSTEM_HTML',
+    };
+    const encoded = encodeURIComponent(JSON.stringify({ fn: 'upsert', sheet: 'WO_MIRROR', row }));
+    await fetch(CFG.secondaryApiUrl + '?fn=upsert&_body=' + encoded, {
+      mode: 'cors',
+      signal: AbortSignal.timeout(15000),
+    });
+    // Tidak perlu handle response — ini one-way mirror, silent fail OK
+  } catch(e) {
+    console.warn('[SecondarySheets] Sync gagal (silent):', e.message);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // HELPERS / BADGES
@@ -4603,7 +4659,7 @@ function getTechNamesStr(wo) {
   return ids.map(id => getTechName(id)).filter(Boolean).join(', ');
 }
 function badgeStatus(status) {
-  const m = {Draft:'b-draft',Open:'b-open',Assigned:'b-assigned','In Progress':'b-inprogress',Done:'b-done',Cancelled:'b-cancelled'};
+  const m = {Draft:'b-draft',Open:'b-open',Assigned:'b-assigned','In Progress':'b-inprogress','Pending Verification':'b-troubleshooting',Done:'b-done',Cancelled:'b-cancelled'};
   return `<span class="badge ${m[status]||'b-draft'}">${status||'Draft'}</span>`;
 }
 function badgeType(type) {
