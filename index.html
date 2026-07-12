@@ -164,6 +164,8 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
   border:1px solid var(--border);background:var(--bg3)}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .15s}
 .photo-thumb:hover img{transform:scale(1.06)}
+.photo-thumb:hover .photo-replace-btn{opacity:1}
+.photo-replace-btn:hover{background:var(--red)!important}
 .photo-pending-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px}
 .photo-pending-item{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
 .photo-pending-item img{width:100%;height:100%;object-fit:cover;display:block}
@@ -4391,19 +4393,203 @@ function handleBeforePhotoSelect(event) {
   });
 }
 
+function readFileAsDataURL(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload  = e => res(e.target.result);
+    reader.onerror = () => rej(new Error('Gagal membaca file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function handleGalleryPhotoUpload(event, woId, category) {
   const files = Array.from(event.target.files).slice(0, 10);
-  event.target.value = ''; // reset supaya bisa pilih file sama lagi nanti
+  event.target.value = '';
   if (!files.length) return;
-
-  // Category label untuk uploadPhotoSet: 'Before' | 'After' | 'Verification'
   const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
-  await uploadPhotoSet(categoryLabel, woId, files);
+  await uploadPhotoSetOptimistic(categoryLabel, woId, files);
+}
 
-  // Refresh tampilan detail + tetap di tab Foto
+// ── Upload dengan preview instan: foto langsung terlihat begitu dipilih
+//    (tersimpan ke localStorage dulu), baru diganti thumbnail asli setelah
+//    selesai diupload ke Drive & disinkron ke Sheets ──
+async function uploadPhotoSetOptimistic(category, woId, files) {
+  if (!files || !files.length) return;
+  const wo = WO.workorders.find(w => w.id === woId);
+  if (!wo) return;
+  wo.photos = wo.photos || { before: [], after: [], verification: [] };
+  const catKey = category.toLowerCase();
+  if (!wo.photos[catKey]) wo.photos[catKey] = [];
+
+  const uploaderName = sanitizeFileToken(SESSION?.nama || 'user');
+  const idToken = sanitizeFileToken(woId);
+  let seq = wo.photos[catKey].length;
+
+  // ── FASE 1: preview lokal instan untuk semua file, simpan ke localStorage dulu ──
+  const placeholders = [];
+  for (const file of files) {
+    let localPreview = '';
+    try { localPreview = await readFileAsDataURL(file); } catch {}
+    const tempId = 'pending-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    const placeholder = {
+      id: null, tempId, name: file.name, url: null,
+      pending: true, localPreview,
+      addedBy: SESSION?.nama || '—', addedAt: new Date().toISOString().split('T')[0],
+    };
+    wo.photos[catKey].push(placeholder);
+    placeholders.push({ file, placeholder });
+  }
+  saveLocal(); // tersimpan lokal SEBELUM ada upload/sync ke server sama sekali
   if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === woId) {
     showDetail(woId);
-    setTimeout(() => switchTab('photos', woId), 100);
+    setTimeout(() => switchTab('photos', woId), 80);
+  }
+
+  // ── FASE 2: upload sungguhan ke Drive, satu per satu, ganti placeholder ──
+  const failedFiles = [];
+  for (const { file, placeholder } of placeholders) {
+    seq++;
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileName = `${category}-${idToken}-${uploaderName}-${String(seq).padStart(3,'0')}.${ext}`;
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload  = e => res(e.target.result.split(',')[1]);
+        reader.onerror = () => rej(new Error('Gagal membaca file'));
+        reader.readAsDataURL(file);
+      });
+      const resp = await fetch(CFG.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          fn: 'upload_attachment', woId, fileName,
+          mimeType: file.type || 'image/jpeg', base64Data: base64,
+        }),
+      });
+      const result = await resp.json();
+      const idx = wo.photos[catKey].findIndex(p => p.tempId === placeholder.tempId);
+      if (result.ok) {
+        if (idx > -1) {
+          wo.photos[catKey][idx] = {
+            id: result.fileId, name: fileName, url: result.url,
+            addedBy: placeholder.addedBy, addedAt: placeholder.addedAt,
+          };
+        }
+      } else {
+        if (idx > -1) wo.photos[catKey].splice(idx, 1);
+        failedFiles.push(fileName + ': ' + (result.message || 'gagal'));
+      }
+    } catch(e) {
+      const idx = wo.photos[catKey].findIndex(p => p.tempId === placeholder.tempId);
+      if (idx > -1) wo.photos[catKey].splice(idx, 1);
+      failedFiles.push(file.name + ': ' + e.message);
+    }
+    saveLocal();
+    if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === woId) {
+      showDetail(woId);
+      setTimeout(() => switchTab('photos', woId), 80);
+    }
+  }
+
+  // ── FASE 3: baru sync final ke Google Sheets ──
+  if (SYNC.timer) { clearTimeout(SYNC.timer); SYNC.timer = null; }
+  syncUpsertWO(wo);
+  await flushQueue();
+
+  const successCount = files.length - failedFiles.length;
+  if (successCount > 0) toast(`${successCount} foto ${category} berhasil diupload`, 'success');
+  if (failedFiles.length > 0) toast(`⚠ ${failedFiles.length} foto gagal diupload:\n${failedFiles.slice(0,3).join('\n')}`, 'error');
+}
+
+// ── Ganti foto yang sudah ada (klik tombol 🔄 di thumbnail) ──
+function triggerPhotoReplace(woId, category, idx) {
+  const input = document.getElementById(`photo-replace-${category}-${woId}`);
+  if (!input) return;
+  input.dataset.replaceIdx = idx;
+  input.click();
+}
+
+async function handleGalleryPhotoReplace(event, woId, category) {
+  const idx = parseInt(event.target.dataset.replaceIdx);
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file || isNaN(idx)) return;
+
+  const wo = WO.workorders.find(w => w.id === woId);
+  if (!wo) return;
+  const catKey = category.toLowerCase();
+  const list = wo.photos && wo.photos[catKey];
+  if (!list || !list[idx]) return;
+
+  const oldFileId = list[idx].id;
+
+  // ── Preview instan di posisi yang sama ──
+  let localPreview = '';
+  try { localPreview = await readFileAsDataURL(file); } catch {}
+  const tempId = 'pending-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  list[idx] = {
+    id: null, tempId, name: file.name, url: null,
+    pending: true, localPreview,
+    addedBy: SESSION?.nama || '—', addedAt: new Date().toISOString().split('T')[0],
+  };
+  saveLocal();
+  if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === woId) {
+    showDetail(woId);
+    setTimeout(() => switchTab('photos', woId), 80);
+  }
+
+  // ── Upload file baru ke Drive ──
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+  const uploaderName = sanitizeFileToken(SESSION?.nama || 'user');
+  const idToken = sanitizeFileToken(woId);
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const fileName = `${categoryLabel}-${idToken}-${uploaderName}-REPLACE-${Date.now()}.${ext}`;
+
+  try {
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload  = e => res(e.target.result.split(',')[1]);
+      reader.onerror = () => rej(new Error('Gagal membaca file'));
+      reader.readAsDataURL(file);
+    });
+    const resp = await fetch(CFG.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        fn: 'upload_attachment', woId, fileName,
+        mimeType: file.type || 'image/jpeg', base64Data: base64,
+      }),
+    });
+    const result = await resp.json();
+    const curIdx = list.findIndex(p => p.tempId === tempId);
+    if (result.ok) {
+      if (curIdx > -1) {
+        list[curIdx] = {
+          id: result.fileId, name: fileName, url: result.url,
+          addedBy: SESSION?.nama || '—', addedAt: new Date().toISOString().split('T')[0],
+        };
+      }
+      toast('✅ Foto berhasil diganti', 'success');
+      if (oldFileId) {
+        _fetchSilent(CFG.apiUrl, { fn: 'delete_attachment', fileId: oldFileId }).catch(() => {});
+      }
+    } else {
+      if (curIdx > -1) list.splice(curIdx, 1);
+      toast('❌ Gagal mengganti foto: ' + (result.message || 'error'), 'error');
+    }
+  } catch(e) {
+    const curIdx = list.findIndex(p => p.tempId === tempId);
+    if (curIdx > -1) list.splice(curIdx, 1);
+    toast('❌ Gagal mengganti foto: ' + e.message, 'error');
+  }
+
+  saveLocal();
+  if (SYNC.timer) { clearTimeout(SYNC.timer); SYNC.timer = null; }
+  syncUpsertWO(wo);
+  await flushQueue();
+  if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === woId) {
+    showDetail(woId);
+    setTimeout(() => switchTab('photos', woId), 80);
   }
 }
 
@@ -4467,6 +4653,7 @@ async function uploadPhotoSet(category, woId, files) {
 function photoGalleryHtml(wo, category, label) {
   const list = (wo.photos && wo.photos[category]) || [];
   const inputId = `photo-upload-${category}-${wo.id}`;
+  const replaceInputId = `photo-replace-${category}-${wo.id}`;
   return `<div style="margin-bottom:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">${esc(label)} (${list.length})</div>
@@ -4478,8 +4665,26 @@ function photoGalleryHtml(wo, category, label) {
       <input type="file" id="${inputId}" accept="image/jpeg,image/jpg,image/png,image/webp" multiple style="display:none"
         onchange="handleGalleryPhotoUpload(event,'${wo.id}','${category}')"/>
     </div>
-    ${list.length ? `<div class="photo-thumb-grid">${list.map((p,i) => `
-      <div class="photo-thumb" onclick="openPhotoViewer('${category}',${i})"><img src="${getThumbnail(p.id)}" loading="lazy" alt="${esc(p.name)}" onerror="this.onerror=null;this.src='${p.url}'"/></div>`).join('')}</div>`
+    <input type="file" id="${replaceInputId}" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none"
+      onchange="handleGalleryPhotoReplace(event,'${wo.id}','${category}')"/>
+    ${list.length ? `<div class="photo-thumb-grid">${list.map((p,i) => {
+      const src = p.pending ? (p.localPreview || '') : getThumbnail(p.id);
+      const clickAttr = p.pending ? '' : `onclick="openPhotoViewer('${category}',${i})"`;
+      return `
+      <div class="photo-thumb" ${clickAttr}>
+        <img src="${src}" loading="lazy" alt="${esc(p.name||'')}" ${p.pending ? '' : `onerror="this.onerror=null;this.src='${p.url||''}'"`}/>
+        ${p.pending ? `
+          <div style="position:absolute;inset:0;background:rgba(26,58,107,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+            <div class="spinner" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></div>
+            <div style="font-size:9px;color:#fff;font-family:'IBM Plex Mono',monospace">Mengupload...</div>
+          </div>` : `
+          <button class="photo-replace-btn" title="Ganti foto ini" data-photo-idx="${i}"
+            onclick="event.stopPropagation();triggerPhotoReplace('${wo.id}','${category}',${i})"
+            style="position:absolute;top:3px;right:3px;background:rgba(26,58,107,.75);border:none;color:#fff;
+              width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;display:flex;
+              align-items:center;justify-content:center;opacity:0;transition:opacity .15s">🔄</button>`}
+      </div>`;
+    }).join('')}</div>`
       : '<div style="font-size:11px;color:var(--text3)">Belum ada foto.</div>'}
   </div>`;
 }
@@ -4487,9 +4692,14 @@ function photoGalleryHtml(wo, category, label) {
 function openPhotoViewer(category, idx) {
   const wo = WO.workorders.find(w => w.id === CURRENT_DETAIL_WO_ID);
   if (!wo || !wo.photos) return;
-  const list = wo.photos[category] || [];
+  const fullList = wo.photos[category] || [];
+  if (!fullList.length) return;
+  // Hanya sertakan foto yang sudah selesai diupload — bukan preview lokal
+  const list = fullList.filter(p => p && p.id && !p.pending);
   if (!list.length) return;
-  PV_STATE = { list, idx, zoomed: false, category };
+  const clickedItem = fullList[idx];
+  const newIdx = Math.max(0, list.findIndex(p => p === clickedItem));
+  PV_STATE = { list, idx: newIdx, zoomed: false, category };
   renderPV();
   document.getElementById('modal-photo-viewer').classList.add('open');
 }
@@ -4894,7 +5104,11 @@ function normalizeWOFromSheets(w) {
     partsUsed:     tryParseArr(w.partsUsed),
     notesLog:      tryParseArr(w.notesLog),
     attachments:   parseAttachmentsFromSheets(w.attachments),
-    photos:        parsePhotosFromSheets(w.photos),
+    photos: {
+      before:       photosCellStrToArr(w.photosBefore),
+      after:        photosCellStrToArr(w.photosAfter),
+      verification: photosCellStrToArr(w.photosVerification),
+    },
     checklistDone:  parseInt(w.checklistDone)  || 0,
     checklistTotal: parseInt(w.checklistTotal) || 0,
     partsCount:     parseInt(w.partsCount)     || 0,
@@ -4942,8 +5156,40 @@ function woToRow(wo) {
     partsCount:     (wo.partsUsed  || []).length,
     notesLog:       notesLogSummary,
     attachments:    attachList,
-    photos:         JSON.stringify(wo.photos || { before: [], after: [], verification: [] }),
+    photosBefore:       photosArrToCellStr(wo.photos && wo.photos.before),
+    photosAfter:        photosArrToCellStr(wo.photos && wo.photos.after),
+    photosVerification: photosArrToCellStr(wo.photos && wo.photos.verification),
   };
+}
+
+// Bersihkan foto sebelum dikirim ke Sheets — buang entry pending/preview lokal
+// supaya data mentah (base64 dataURL) tidak pernah tersimpan/terkirim ke server
+function sanitizePhotosForSync(photos) {
+  const p = photos || {};
+  const clean = cat => (p[cat] || [])
+    .filter(x => x && x.id && !x.pending)
+    .map(x => ({ id: x.id, name: x.name, url: x.url, addedBy: x.addedBy, addedAt: x.addedAt }));
+  return { before: clean('before'), after: clean('after'), verification: clean('verification') };
+}
+
+// Ubah array foto jadi string 1 sel: "fileId|nama ; fileId|nama ; ..."
+function photosArrToCellStr(arr) {
+  return (arr || [])
+    .filter(p => p && p.id && !p.pending)
+    .map(p => (p.id + '|' + (p.name || p.id).replace(/\|/g, '-')))
+    .join(' ; ');
+}
+
+// Parse balik dari format sel "fileId|nama ; fileId|nama" → array object foto
+function photosCellStrToArr(str) {
+  if (!str) return [];
+  return String(str).split(';').map(item => {
+    const parts = item.trim().split('|');
+    if (!parts[0]) return null;
+    const id = parts[0].trim();
+    const name = (parts[1] || id).trim();
+    return { id, name, url: getDriveUrl(id) };
+  }).filter(Boolean);
 }
 
 // Backward-compat stubs (lama dipanggil langsung, sekarang pakai queue)
@@ -5035,22 +5281,6 @@ function parseAttachmentsFromSheets(val) {
     if (!parts[0]) return null;
     return { id: parts[0] || '', name: parts[1] || parts[0], type: parts[2] || 'doc', size: parts[3] || '' };
   }).filter(Boolean);
-}
-
-function parsePhotosFromSheets(val) {
-  const empty = { before: [], after: [], verification: [] };
-  if (!val || val === '') return empty;
-  try {
-    const p = JSON.parse(val);
-    if (p && typeof p === 'object') {
-      return {
-        before:       Array.isArray(p.before) ? p.before : [],
-        after:        Array.isArray(p.after) ? p.after : [],
-        verification: Array.isArray(p.verification) ? p.verification : [],
-      };
-    }
-  } catch {}
-  return empty;
 }
    
    function getEquipName(equipId) {
@@ -5187,58 +5417,44 @@ function getLogoBase64() {
 // ── Bangun section lampiran foto (Before/After/Verification) untuk form cetak WO ──
 function printPhotoAttachmentSection(wo) {
   const photos = wo.photos || { before: [], after: [], verification: [] };
-  const totalPhotos = (photos.before||[]).length + (photos.after||[]).length + (photos.verification||[]).length;
-  if (totalPhotos === 0) return '';
-
   const CATS = [
-    { key: 'before',       label: 'FOTO SEBELUM (BEFORE)',      color: '#2b6cb8' },
-    { key: 'after',        label: 'FOTO SESUDAH (AFTER)',       color: '#4a9e3f' },
-    { key: 'verification', label: 'FOTO VERIFIKASI (VERIFICATION)', color: '#b88ff7' },
+    { key: 'before',       label: 'BEFORE',       color: '#2b6cb8' },
+    { key: 'after',        label: 'AFTER',        color: '#4a9e3f' },
+    { key: 'verification', label: 'VERIFICATION', color: '#b88ff7' },
   ];
 
-  const groupsHtml = CATS.map(cat => {
-    const list = photos[cat.key] || [];
-    if (!list.length) return '';
-    const photoCells = list.map((p, i) => {
-      const imgUrl = p.id ? `https://drive.google.com/thumbnail?id=${p.id}&sz=w400` : (p.url || '');
-      return `<td style="width:33.3%;padding:4pt;text-align:center;vertical-align:top;border:.5pt solid #ddd">
-        <img src="${imgUrl}" style="width:100%;max-height:110pt;object-fit:cover;border:.5pt solid #ccc;border-radius:3pt;display:block;margin-bottom:3pt"/>
-        <div style="font-size:6.5pt;color:#555">Foto ${i+1}${p.addedBy ? ' — ' + p.addedBy : ''}</div>
-        ${p.addedAt ? `<div style="font-size:6pt;color:#999">${p.addedAt}</div>` : ''}
-      </td>`;
-    }).join('');
-
-    // Bungkus 3 foto per baris
-    const rows = [];
-    const cellsArr = list.map((p, i) => {
-      const imgUrl = p.id ? `https://drive.google.com/thumbnail?id=${p.id}&sz=w400` : (p.url || '');
-      return `<td style="width:33.3%;padding:4pt;text-align:center;vertical-align:top;border:.5pt solid #ddd">
-        <img src="${imgUrl}" style="width:100%;max-height:110pt;object-fit:cover;border:.5pt solid #ccc;border-radius:3pt;display:block;margin-bottom:3pt"/>
-        <div style="font-size:6.5pt;color:#555">Foto ${i+1}${p.addedBy ? ' — ' + p.addedBy : ''}</div>
-        ${p.addedAt ? `<div style="font-size:6pt;color:#999">${p.addedAt}</div>` : ''}
-      </td>`;
+  // Gabungkan semua foto jadi satu list mengalir, tiap foto bawa label kategorinya sendiri
+  // — tidak ada lagi kotak kosong karena tidak dipaksa 3 kotak per kategori.
+  const allPhotos = [];
+  CATS.forEach(cat => {
+    (photos[cat.key] || []).forEach((p, i) => {
+      allPhotos.push({ ...p, catLabel: cat.label, catColor: cat.color, seq: i + 1 });
     });
-    for (let i = 0; i < cellsArr.length; i += 3) {
-      const rowCells = cellsArr.slice(i, i + 3);
-      while (rowCells.length < 3) rowCells.push('<td style="width:33.3%;border:.5pt solid #ddd"></td>');
-      rows.push(`<tr>${rowCells.join('')}</tr>`);
-    }
+  });
 
-    return `
-      <div style="margin-bottom:10pt;page-break-inside:avoid">
-        <div style="font-size:8pt;font-weight:700;color:#fff;background:${cat.color};padding:3pt 6pt;letter-spacing:.04em">
-          ${cat.label} &nbsp;(${list.length} foto)
-        </div>
-        <table style="width:100%;border-collapse:collapse;border:.5pt solid #ddd;border-top:none">
-          ${rows.join('')}
-        </table>
-      </div>`;
-  }).join('');
+  if (!allPhotos.length) return '';
+
+  const cellsArr = allPhotos.map(p => {
+    const imgUrl = p.id ? `https://drive.google.com/thumbnail?id=${p.id}&sz=w400` : (p.url || '');
+    return `<td style="width:33.3%;padding:5pt;text-align:center;vertical-align:top;border:.5pt solid #ddd">
+      <div style="font-size:6.5pt;font-weight:700;color:#fff;background:${p.catColor};display:inline-block;padding:1pt 7pt;border-radius:3pt;margin-bottom:3pt;letter-spacing:.03em">${p.catLabel}</div>
+      <img src="${imgUrl}" style="width:100%;max-height:120pt;object-fit:cover;border:.5pt solid #ccc;border-radius:3pt;display:block;margin:3pt 0"/>
+      <div style="font-size:6.5pt;color:#555">Foto ${p.seq}${p.addedBy ? ' — ' + p.addedBy : ''}</div>
+      ${p.addedAt ? `<div style="font-size:6pt;color:#999">${p.addedAt}</div>` : ''}
+    </td>`;
+  });
+
+  const rows = [];
+  for (let i = 0; i < cellsArr.length; i += 3) {
+    rows.push(`<tr>${cellsArr.slice(i, i + 3).join('')}</tr>`);
+  }
 
   return `
-    <div style="margin-top:10pt">
-      <div class="print-section-title" style="margin-top:8pt">Lampiran Foto Dokumentasi</div>
-      ${groupsHtml}
+    <div style="margin-top:10pt;page-break-inside:avoid">
+      <div class="print-section-title" style="margin-top:8pt">Lampiran Foto Dokumentasi (${allPhotos.length} foto)</div>
+      <table style="width:100%;border-collapse:collapse;border:.5pt solid #ddd">
+        ${rows.join('')}
+      </table>
     </div>`;
 }
 
