@@ -4067,10 +4067,14 @@ function openVerifyPhotoPicker(woId) {
     addAudit(wo, 'status', `Diverifikasi & ditutup oleh requestor: ${SESSION.nama}`);
     saveLocal(); showDetail(woId); refreshAll();
     toast('✅ WO telah diverifikasi dan ditutup', 'success');
-    syncUpsertWO(wo);
     sendWANotif('done', wo);
-    syncToSecondarySheets(wo);
+    // Upload foto verification DULU sampai selesai, baru sync WO — supaya data foto lengkap saat dikirim ke Sheets
     await uploadPhotoSet('Verification', woId, files);
+    // Force flush langsung (bypass debounce) supaya tidak ada race dengan panggilan sync lain
+    if (SYNC.timer) { clearTimeout(SYNC.timer); SYNC.timer = null; }
+    syncUpsertWO(wo);
+    await flushQueue();
+    syncToSecondarySheets(wo);
     if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === woId) showDetail(woId);
   };
   input.click();
