@@ -2243,6 +2243,46 @@ let PP_SELECTED = { partId: null, qty: 1 };
 let CURRENT_DETAIL_WO_ID = null;
 let WO_BEFORE_FILES = [];
 let PV_STATE = { list: [], idx: 0, zoomed: false, category: '' };
+const IMG_CACHE = {}; // fileId -> data URI (cache di memori per sesi)
+
+// Ambil gambar via proxy GAS (base64) — tidak bergantung sharing publik Drive
+async function loadImageDataURI(fileId) {
+  if (!fileId) return '';
+  if (IMG_CACHE[fileId]) return IMG_CACHE[fileId];
+  try {
+    const r = await fetch(CFG.apiUrl + '?fn=get_thumbnail&id=' + encodeURIComponent(fileId), {
+      mode: 'cors', signal: AbortSignal.timeout(20000),
+    });
+    const d = await r.json();
+    if (d.ok && d.base64) {
+      const uri = `data:${d.mimeType||'image/jpeg'};base64,${d.base64}`;
+      IMG_CACHE[fileId] = uri;
+      return uri;
+    }
+  } catch(e) {
+    console.warn('[loadImageDataURI] gagal load', fileId, e.message);
+  }
+  return '';
+}
+
+// Isi semua <img class="ph-lazy" data-fid> yang belum di-hydrate di dalam scopeEl
+async function hydratePhotoThumbnails(scopeEl) {
+  if (!scopeEl) return;
+  const imgs = scopeEl.querySelectorAll('img.ph-lazy[data-fid]:not([data-hydrated])');
+  for (const img of imgs) {
+    const fid = img.dataset.fid;
+    if (!fid) continue;
+    img.dataset.hydrated = '1';
+    const uri = await loadImageDataURI(fid);
+    if (uri) {
+      img.src = uri;
+    } else {
+      const wrap = img.closest('.photo-thumb, .attach-card-link, .attach-wrap');
+      if (wrap) wrap.style.opacity = '0.35';
+      img.alt = '⚠ Gagal memuat gambar';
+    }
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // INIT
@@ -3232,9 +3272,8 @@ function showDetail(woId) {
                 <div class="attach-wrap">
                   <a class="attach-card-link" href="${getDriveUrl(a.id)}" target="_blank" title="Buka ${esc(a.name)}">
                     ${a.type === 'image'
-                      ? `<img src="${getThumbnail(a.id)}" alt="${esc(a.name)}" loading="lazy"
-                          style="width:100%;height:60px;object-fit:cover;border-radius:5px;margin-bottom:4px"
-                          onerror="this.style.display='none'"/>`
+                      ? `<img src="" data-fid="${a.id||''}" alt="${esc(a.name)}" loading="lazy" class="ph-lazy"
+                          style="width:100%;height:60px;object-fit:cover;border-radius:5px;margin-bottom:4px"/>`
                       : `<div class="attach-ico">${a.type === 'pdf' ? '📕' : a.type === 'video' ? '🎬' : '📄'}</div>`}
                     <div class="attach-name">${esc(a.name)}</div>
                     <div class="attach-size">${a.size||''}</div>
@@ -3340,6 +3379,8 @@ function switchTab(tab, woId) {
     if (btn) btn.classList.toggle('active', t === tab);
   });
   if (tab === 'history' && wo && wo.equipId) loadEquipHistory(wo.equipId);
+  if (tab === 'photos') hydratePhotoThumbnails(document.getElementById('tab-photos'));
+  if (tab === 'attach') hydratePhotoThumbnails(document.getElementById('tab-attach'));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4675,12 +4716,13 @@ function photoGalleryHtml(wo, category, label) {
     <input type="file" id="${replaceInputId}" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none"
       onchange="handleGalleryPhotoReplace(event,'${wo.id}','${category}')"/>
     ${list.length ? `<div class="photo-thumb-grid">${list.map((p,i) => {
-      const src = p.pending ? (p.localPreview || '') : getThumbnail(p.id);
       const clickAttr = p.pending ? '' : `onclick="openPhotoViewer('${category}',${i})"`;
+      const imgTag = p.pending
+        ? `<img src="${p.localPreview||''}" loading="lazy" alt="${esc(p.name||'')}"/>`
+        : `<img src="" loading="lazy" alt="${esc(p.name||'')}" data-fid="${p.id||''}" class="ph-lazy"/>`;
       return `
       <div class="photo-thumb" ${clickAttr}>
-        <img src="${src}" loading="lazy" alt="${esc(p.name||'')}" data-fid="${p.id||''}"
-          ${p.pending ? '' : `onerror="this.onerror=null;this.src=getThumbnailFallback(this.dataset.fid)||'${p.url||''}'"`}/>
+        ${imgTag}
         ${p.pending ? `
           <div style="position:absolute;inset:0;background:rgba(26,58,107,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
             <div class="spinner" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></div>
@@ -4711,19 +4753,23 @@ function openPhotoViewer(category, idx) {
   renderPV();
   document.getElementById('modal-photo-viewer').classList.add('open');
 }
-function renderPV() {
+async function renderPV() {
   const item = PV_STATE.list[PV_STATE.idx];
   if (!item) return;
-  // Gunakan thumbnail resolusi lebih besar untuk viewer (bukan link /view Drive)
-  document.getElementById('pv-img').src = item.id ? getThumbnail(item.id) : item.url;
-  document.getElementById('pv-img').style.transform = 'scale(1)';
-  document.getElementById('pv-img').style.cursor = 'zoom-in';
+  const imgEl = document.getElementById('pv-img');
+  imgEl.src = IMG_CACHE[item.id] || '';
+  imgEl.style.transform = 'scale(1)';
+  imgEl.style.cursor = 'zoom-in';
   document.getElementById('pv-title').textContent = item.name || 'Foto';
   document.getElementById('pv-counter').textContent = `${PV_STATE.idx+1} / ${PV_STATE.list.length}`;
   const dl = document.getElementById('pv-download');
   dl.href = item.url;
   dl.setAttribute('download', item.name || 'photo.jpg');
   PV_STATE.zoomed = false;
+  if (item.id && !IMG_CACHE[item.id]) {
+    const uri = await loadImageDataURI(item.id);
+    if (PV_STATE.list[PV_STATE.idx] === item) imgEl.src = uri || item.url;
+  }
 }
 function pvNav(dir) {
   if (!PV_STATE.list.length) return;
