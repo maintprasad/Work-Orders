@@ -2269,7 +2269,14 @@ function init() {
       EQUIP_DB.parts     = d.parts     || [];
     } catch {}
   }
-
+window.addEventListener('beforeunload', function(e) {
+  const pendingCount = Object.keys(SYNC.queue).length;
+  if (pendingCount > 0 || SYNC.inFlight) {
+    e.preventDefault();
+    e.returnValue = 'Masih ada perubahan yang belum tersimpan ke server. Yakin ingin keluar?';
+    return e.returnValue;
+  }
+});
   setupNav();
 
   // filterStatus default kosong = tampilkan semua WO
@@ -5172,23 +5179,35 @@ function sanitizePhotosForSync(photos) {
   return { before: clean('before'), after: clean('after'), verification: clean('verification') };
 }
 
-// Ubah array foto jadi string 1 sel: "fileId|nama ; fileId|nama ; ..."
+// Ubah array foto jadi string 1 sel berisi URL Drive utuh yang bisa langsung diklik
 function photosArrToCellStr(arr) {
   return (arr || [])
     .filter(p => p && p.id && !p.pending)
-    .map(p => (p.id + '|' + (p.name || p.id).replace(/\|/g, '-')))
+    .map(p => `https://drive.google.com/file/d/${p.id}/view (${(p.name || p.id).replace(/[()]/g,'')})`)
     .join(' ; ');
 }
 
-// Parse balik dari format sel "fileId|nama ; fileId|nama" → array object foto
+// Parse balik — mendukung format URL baru DAN format lama (fileId|nama) untuk data lama
 function photosCellStrToArr(str) {
   if (!str) return [];
   return String(str).split(';').map(item => {
-    const parts = item.trim().split('|');
-    if (!parts[0]) return null;
-    const id = parts[0].trim();
-    const name = (parts[1] || id).trim();
-    return { id, name, url: getDriveUrl(id) };
+    const s = item.trim();
+    if (!s) return null;
+    const urlMatch = s.match(/https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
+    if (urlMatch) {
+      const id = urlMatch[1];
+      const nameMatch = s.match(/\(([^)]+)\)\s*$/);
+      const name = nameMatch ? nameMatch[1] : id;
+      return { id, name, url: getDriveUrl(id) };
+    }
+    // Fallback format lama: fileId|nama
+    const parts = s.split('|');
+    if (parts[0]) {
+      const id = parts[0].trim();
+      const name = (parts[1] || id).trim();
+      return { id, name, url: getDriveUrl(id) };
+    }
+    return null;
   }).filter(Boolean);
 }
 
