@@ -4679,7 +4679,8 @@ function photoGalleryHtml(wo, category, label) {
       const clickAttr = p.pending ? '' : `onclick="openPhotoViewer('${category}',${i})"`;
       return `
       <div class="photo-thumb" ${clickAttr}>
-        <img src="${src}" loading="lazy" alt="${esc(p.name||'')}" ${p.pending ? '' : `onerror="this.onerror=null;this.src='${p.url||''}'"`}/>
+        <img src="${src}" loading="lazy" alt="${esc(p.name||'')}" data-fid="${p.id||''}"
+          ${p.pending ? '' : `onerror="this.onerror=null;this.src=getThumbnailFallback(this.dataset.fid)||'${p.url||''}'"`}/>
         ${p.pending ? `
           <div style="position:absolute;inset:0;background:rgba(26,58,107,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
             <div class="spinner" style="border-color:rgba(255,255,255,.3);border-top-color:#fff"></div>
@@ -5360,7 +5361,10 @@ function getDriveUrl(fileId) {
   return fileId ? `https://drive.google.com/file/d/${fileId}/view` : '#';
 }
 function getThumbnail(fileId) {
-  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}` : '';
+  return fileId ? `https://lh3.googleusercontent.com/d/${fileId}=w400` : '';
+}
+function getThumbnailFallback(fileId) {
+  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w400` : '';
 }
 function getDownloadUrl(fileId) {
   return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : '#';
@@ -5454,7 +5458,7 @@ function printPhotoAttachmentSection(wo) {
   if (!allPhotos.length) return '';
 
   const cellsArr = allPhotos.map(p => {
-    const imgUrl = p.id ? `https://drive.google.com/thumbnail?id=${p.id}&sz=w400` : (p.url || '');
+    const imgUrl = p.id ? `https://lh3.googleusercontent.com/d/${p.id}=w400` : (p.url || '');
     return `<td style="width:33.3%;padding:5pt;text-align:center;vertical-align:top;border:.5pt solid #ddd">
       <div style="font-size:6.5pt;font-weight:700;color:#fff;background:${p.catColor};display:inline-block;padding:1pt 7pt;border-radius:3pt;margin-bottom:3pt;letter-spacing:.03em">${p.catLabel}</div>
       <img src="${imgUrl}" style="width:100%;max-height:120pt;object-fit:cover;border:.5pt solid #ccc;border-radius:3pt;display:block;margin:3pt 0"/>
