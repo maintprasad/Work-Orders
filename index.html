@@ -934,7 +934,7 @@ input:checked + .slider:before{transform:translateX(18px)}
   .print-company{font-size:15pt;font-weight:700;color:#1a3a6b}
   .print-doc-title{font-size:11pt;color:#3a5a3a;margin-top:3pt}
   .print-meta{text-align:right;font-size:9pt;color:#555;line-height:1.6}
-  .print-kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:6pt;margin-bottom:14pt}
+  .print-kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:6pt;margin-bottom:14pt}
   .print-kpi-card{border:1pt solid #ccc;border-radius:5pt;padding:8pt;text-align:center;background:#f9f9f9!important}
   .print-kpi-val{font-size:18pt;font-weight:700;color:#1a3a6b;line-height:1}
   .print-kpi-lbl{font-size:7.5pt;color:#666;text-transform:uppercase;letter-spacing:.05em;margin-top:3pt}
@@ -1079,6 +1079,7 @@ html,body{overscroll-behavior-y:none;touch-action:manipulation}
     <div class="sb-item" data-page="dashboard"><span class="sb-icon">◈</span>Dashboard</div>
     <div class="sb-item" data-page="technicians"><span class="sb-icon">👷</span>Teknisi</div>
     <div class="sb-item" data-page="equip-history-admin"><span class="sb-icon">🔧</span>Equip. History</div>
+    <div class="sb-item" data-page="mttr-mtbf"><span class="sb-icon">⏱</span>MTTR / MTBF</div>
     </div>
 
   <!-- STATUS FILTER — Maintenance + Admin -->
@@ -1308,6 +1309,14 @@ html,body{overscroll-behavior-y:none;touch-action:manipulation}
       </div>
       <div class="rac-btns"><button class="btn-ghost" onclick="event.stopPropagation();navigateTo('equip-history-admin')">Buka →</button></div>
     </div>
+    <div class="report-action-card" onclick="navigateTo('mttr-mtbf')">
+      <div class="rac-ico">⏱</div>
+      <div class="rac-info">
+        <div class="rac-title">MTTR / MTBF Equipment</div>
+        <div class="rac-desc">Rata-rata waktu perbaikan (MTTR) & jarak antar kerusakan (MTBF) per equipment</div>
+      </div>
+      <div class="rac-btns"><button class="btn-ghost" onclick="event.stopPropagation();navigateTo('mttr-mtbf')">Buka →</button></div>
+    </div>
   </div>
 
   <div class="sec-hdr" style="margin-bottom:14px">
@@ -1524,21 +1533,24 @@ _Terima kasih. WO telah ditutup._</div>
       <div class="stat-val" id="cmp-avg-rate">—</div>
       <div class="stat-sub">sepanjang tahun</div>
     </div>
-    <div class="stat-card c-teal">
-      <div class="stat-lbl">WO Tertunda</div>
+    <div class="stat-card c-teal" onclick="filterWO('Pending Verification')">
+      <div class="stat-lbl">Pending For Verification</div>
       <div class="stat-val" id="cmp-backlog">—</div>
-      <div class="stat-sub">WO masuk belum diselesaikan</div>
+      <div class="stat-sub">menunggu verifikasi requestor</div>
     </div>
   </div>
 
   <!-- Chart area -->
   <div class="detail-panel" style="margin-bottom:20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:var(--navy)">Grafik Perbandingan WO Masuk vs Selesai</div>
-      <div style="display:flex;gap:16px;font-size:11px;font-family:'IBM Plex Mono',monospace">
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:2px;background:#2b6cb8;display:inline-block"></span>Masuk</span>
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:2px;background:#4a9e3f;display:inline-block"></span>Selesai</span>
-        <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:2px;background:#fb8c3a;display:inline-block"></span>Backlog</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--navy)">Grafik Perbandingan Status Work Order</div>
+      <div style="display:flex;gap:12px;font-size:10px;font-family:'IBM Plex Mono',monospace;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:2px;background:#2b6cb8;display:inline-block"></span>Masuk</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:2px;background:#4a9e3f;display:inline-block"></span>Selesai</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:2px;background:#fb8c3a;display:inline-block"></span>Open</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:2px;background:#b88ff7;display:inline-block"></span>Pending Verif.</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:2px;background:#8891a8;display:inline-block"></span>Cancelled</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:11px;height:11px;border-radius:2px;background:#c0392b;display:inline-block"></span>Rejected</span>
       </div>
     </div>
     <div style="position:relative;width:100%;overflow-x:auto">
@@ -1623,6 +1635,71 @@ _Terima kasih. WO telah ditutup._</div>
 
   <!-- Equipment list dengan accordion -->
   <div id="eha-equip-list"></div>
+</div>
+
+<!-- ─── PAGE: MTTR / MTBF ─── -->
+<div class="page" id="page-mttr-mtbf">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">⏱ MTTR / MTBF Equipment <span class="admin-badge">ADMIN</span></div>
+      <div class="sec-sub">Mean Time To Repair & Mean Time Between Failures — per equipment, area, unit</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="toolbar" style="margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <select class="fsel" id="mtbf-unit" onchange="onMTBFUnitChange()" style="min-width:130px">
+      <option value="">Semua Unit</option>
+    </select>
+    <select class="fsel" id="mtbf-area" onchange="renderMTTRMTBFPage()" style="min-width:130px">
+      <option value="">Semua Area</option>
+    </select>
+    <div class="search-wrap" style="max-width:240px">
+      <span style="color:var(--text3);font-size:13px">⌕</span>
+      <input type="text" id="mtbf-search" placeholder="Cari equipment..." oninput="renderMTTRMTBFPage()"/>
+    </div>
+    <button class="btn-ghost" onclick="resetMTBFFilter()" id="mtbf-reset-btn" style="display:none">✕ Reset</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="stat-grid" style="margin-bottom:20px" id="mtbf-stat-grid">
+    <div class="stat-card c-blue">
+      <div class="stat-lbl">Equipment Termonitor</div>
+      <div class="stat-val" id="mtbf-total-equip">—</div>
+      <div class="stat-sub">punya minimal 1 perbaikan Done</div>
+    </div>
+    <div class="stat-card c-teal">
+      <div class="stat-lbl">Rata-rata MTTR</div>
+      <div class="stat-val" id="mtbf-avg-mttr" style="font-size:18px">—</div>
+      <div class="stat-sub">waktu perbaikan rata-rata</div>
+    </div>
+    <div class="stat-card c-purple">
+      <div class="stat-lbl">Rata-rata MTBF</div>
+      <div class="stat-val" id="mtbf-avg-mtbf" style="font-size:18px">—</div>
+      <div class="stat-sub">jarak antar kerusakan rata-rata</div>
+    </div>
+    <div class="stat-card c-orange">
+      <div class="stat-lbl">Equipment Berulang</div>
+      <div class="stat-val" id="mtbf-repeat-count">—</div>
+      <div class="stat-sub">≥ 2x perbaikan (punya data MTBF)</div>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Equipment</th>
+          <th>Unit</th>
+          <th>Area</th>
+          <th>Jml Perbaikan</th>
+          <th>MTTR (Avg)</th>
+          <th>MTBF (Avg)</th>
+        </tr>
+      </thead>
+      <tbody id="mtbf-tbody"></tbody>
+    </table>
+  </div>
 </div>
 
 </main>
@@ -2133,7 +2210,10 @@ _Terima kasih. WO telah ditutup._</div>
           <select class="fsel2" id="print-filter-status">
             <option value="">Semua Status</option>
             <option>Open</option>
-            <option>In Progress</option><option>Done</option><option>Cancelled</option>
+            <option>In Progress</option>
+            <option>Pending Verification</option>
+            <option>Rejected</option>
+            <option>Done</option><option>Cancelled</option>
           </select>
         </div>
         <div class="fg">
@@ -2532,7 +2612,7 @@ function navigateTo(page) {
   // Role access control
   if (!SESSION) return;
   const role = SESSION.role;
-  const adminOnly = ['user-management','notif-settings','dashboard','technicians','reports'];
+  const adminOnly = ['user-management','notif-settings','dashboard','technicians','reports','mttr-mtbf'];
   if (adminOnly.includes(page) && role !== 'Admin') {
     // Maintenance can also access dashboard, technicians, reports, rating
     const maintAllowed = ['dashboard','technicians','reports','rating'];
@@ -2579,6 +2659,7 @@ function navigateTo(page) {
   if (page === 'user-management')  renderUserManagement();
   if (page === 'notif-settings')   renderNotifSettings();
   if (page === 'equip-history-admin') renderEHAPage();
+  if (page === 'mttr-mtbf')           renderMTTRMTBFPage();
 }
 
 function refreshAll() {
@@ -6942,6 +7023,163 @@ function toggleEHAAccordion(id) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MTTR / MTBF — Mean Time To Repair & Mean Time Between Failures
+// ═══════════════════════════════════════════════════════════════
+
+// Format durasi jam desimal → "X hari Y jam Z menit" (atau "Y jam Z menit" jika < 24 jam)
+function formatDurationHM(hoursDecimal) {
+  if (hoursDecimal === null || hoursDecimal === undefined || isNaN(hoursDecimal) || hoursDecimal <= 0) return '—';
+  const totalMinutes = Math.round(hoursDecimal * 60);
+  const days  = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const mins  = totalMinutes % 60;
+  const parts = [];
+  if (days > 0) parts.push(days + ' hari');
+  if (days > 0 || hours > 0) parts.push(hours + ' jam');
+  parts.push(mins + ' menit');
+  return parts.join(' ');
+}
+
+// Hitung MTTR & MTBF per equipment dari seluruh WO Done yang punya equipId
+function computeMTTRMTBF() {
+  const doneWOs = WO.workorders.filter(w => w.equipId && w.status === 'Done');
+  const map = {};
+
+  doneWOs.forEach(w => {
+    if (!map[w.equipId]) {
+      const eq     = (EQUIP_DB.equipment || []).find(e => e.id === w.equipId);
+      const unitId = eq?.unitId || w.unitId || '';
+      const areaId = eq?.areaId || w.areaId || '';
+      map[w.equipId] = {
+        equipId:   w.equipId,
+        equipName: getEquipName(w.equipId) || w.equipId,
+        unitId, areaId,
+        unitName: unitId ? getUnitName(unitId) : '—',
+        areaName: areaId ? getAreaName(areaId) : '—',
+        repairs:  [],
+      };
+    }
+    map[w.equipId].repairs.push({
+      hours:     parseFloat(w.actualHours) || 0,
+      createdAt: w.createdAt,
+    });
+  });
+
+  return Object.values(map).map(eq => {
+    // MTTR: rata-rata durasi pengerjaan (actualHours) semua WO Done equipment ini
+    const sorted   = eq.repairs.slice().sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const hoursArr = sorted.map(r => r.hours).filter(h => h > 0);
+    const mttrHours = hoursArr.length ? hoursArr.reduce((a,b) => a+b, 0) / hoursArr.length : null;
+
+    // MTBF: rata-rata jarak waktu antar WO berurutan (WO ke-1→ke-2, ke-2→ke-3, dst) per equipment
+    let mtbfHours = null;
+    if (sorted.length >= 2) {
+      const intervals = [];
+      for (let i = 1; i < sorted.length; i++) {
+        const diffH = (new Date(sorted[i].createdAt) - new Date(sorted[i-1].createdAt)) / 3600000;
+        if (diffH > 0) intervals.push(diffH);
+      }
+      if (intervals.length) mtbfHours = intervals.reduce((a,b) => a+b, 0) / intervals.length;
+    }
+
+    return { ...eq, repairCount: sorted.length, mttrHours, mtbfHours };
+  }).sort((a,b) => {
+    const uCmp = (a.unitName||'').localeCompare(b.unitName||'');
+    if (uCmp !== 0) return uCmp;
+    const aCmp = (a.areaName||'').localeCompare(b.areaName||'');
+    if (aCmp !== 0) return aCmp;
+    return (a.equipName||'').localeCompare(b.equipName||'');
+  });
+}
+
+function onMTBFUnitChange() {
+  const unitId  = document.getElementById('mtbf-unit')?.value || '';
+  const areaSel = document.getElementById('mtbf-area');
+  if (areaSel) {
+    areaSel.innerHTML = '<option value="">Semua Area</option>';
+    const areas = unitId
+      ? (EQUIP_DB.areas || []).filter(a => a.unitId === unitId)
+      : (EQUIP_DB.areas || []);
+    areas.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id; opt.textContent = a.name;
+      areaSel.appendChild(opt);
+    });
+  }
+  renderMTTRMTBFPage();
+}
+
+function resetMTBFFilter() {
+  ['mtbf-unit','mtbf-area'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const s = document.getElementById('mtbf-search');
+  if (s) s.value = '';
+  onMTBFUnitChange();
+  renderMTTRMTBFPage();
+}
+
+function renderMTTRMTBFPage() {
+  const unitSel = document.getElementById('mtbf-unit');
+  if (unitSel && unitSel.children.length <= 1) {
+    (EQUIP_DB.units || []).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id; opt.textContent = u.name;
+      unitSel.appendChild(opt);
+    });
+  }
+
+  const fUnit = document.getElementById('mtbf-unit')?.value || '';
+  const fArea = document.getElementById('mtbf-area')?.value || '';
+  const fQ    = (document.getElementById('mtbf-search')?.value || '').toLowerCase();
+  const hasFilter = fUnit || fArea || fQ;
+
+  const resetBtn = document.getElementById('mtbf-reset-btn');
+  if (resetBtn) resetBtn.style.display = hasFilter ? '' : 'none';
+
+  let list = computeMTTRMTBF();
+  if (fUnit) list = list.filter(e => e.unitId === fUnit);
+  if (fArea) list = list.filter(e => e.areaId === fArea);
+  if (fQ)    list = list.filter(e => e.equipName.toLowerCase().includes(fQ));
+
+  // Summary cards
+  const mttrVals = list.map(e => e.mttrHours).filter(v => v !== null && v > 0);
+  const mtbfVals = list.map(e => e.mtbfHours).filter(v => v !== null && v > 0);
+  const avgMttr  = mttrVals.length ? mttrVals.reduce((a,b)=>a+b,0) / mttrVals.length : null;
+  const avgMtbf  = mtbfVals.length ? mtbfVals.reduce((a,b)=>a+b,0) / mtbfVals.length : null;
+
+  setText('mtbf-total-equip',  list.length);
+  setText('mtbf-avg-mttr',     formatDurationHM(avgMttr));
+  setText('mtbf-avg-mtbf',     formatDurationHM(avgMtbf));
+  setText('mtbf-repeat-count', list.filter(e => e.repairCount >= 2).length);
+
+  const tbody = document.getElementById('mtbf-tbody');
+  if (!tbody) return;
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6">${emptyState('⏱', hasFilter ? 'Tidak ada equipment yang cocok dengan filter' : 'Belum ada equipment dengan history perbaikan Done')}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(e => {
+    const mttrColor = e.mttrHours ? (e.mttrHours <= 4 ? 'var(--green2)' : e.mttrHours <= 12 ? '#c07020' : 'var(--red)') : 'var(--text3)';
+    const mtbfColor = e.mtbfHours ? (e.mtbfHours >= 720 ? 'var(--green2)' : e.mtbfHours >= 168 ? '#c07020' : 'var(--red)') : 'var(--text3)';
+    const mtbfCell = e.repairCount >= 2
+      ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${mtbfColor};font-weight:600">${formatDurationHM(e.mtbfHours)}</span>`
+      : `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)">— (perlu ≥2x)</span>`;
+    return `<tr>
+      <td><span style="font-weight:500">${esc(e.equipName)}</span></td>
+      <td><span class="td-mono" style="font-size:11px">${esc(e.unitName)}</span></td>
+      <td><span style="font-size:12px;color:var(--text2)">${esc(e.areaName)}</span></td>
+      <td><span class="td-mono">${e.repairCount}</span></td>
+      <td><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${mttrColor};font-weight:600">${formatDurationHM(e.mttrHours)}</span></td>
+      <td>${mtbfCell}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function downloadEHAExcel(equipId, equipName, unitName, areaName) {
   const btn = event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
@@ -8041,6 +8279,7 @@ function executePrint() {
   const done     = filtered.filter(w => w.status === 'Done').length;
   const inProg   = filtered.filter(w => w.status === 'In Progress').length;
   const open     = filtered.filter(w => w.status === 'Open').length;
+  const pendingVerif = filtered.filter(w => w.status === 'Pending Verification').length;
   const rate     = total ? Math.round(done / total * 100) : 0;
   const avgHours = (() => {
     const doneWO = filtered.filter(w => w.status === 'Done' && parseFloat(w.actualHours) > 0);
@@ -8061,6 +8300,7 @@ function executePrint() {
       <div class="print-kpi-card"><div class="print-kpi-val">${done}</div><div class="print-kpi-lbl">Selesai</div></div>
       <div class="print-kpi-card"><div class="print-kpi-val">${rate}%</div><div class="print-kpi-lbl">Completion Rate</div></div>
       <div class="print-kpi-card"><div class="print-kpi-val">${inProg}</div><div class="print-kpi-lbl">In Progress</div></div>
+      <div class="print-kpi-card"><div class="print-kpi-val">${pendingVerif}</div><div class="print-kpi-lbl">Pending Verification</div></div>
       <div class="print-kpi-card"><div class="print-kpi-val">${avgHours}</div><div class="print-kpi-lbl">Avg Durasi</div></div>
     </div>` : '';
 
@@ -8077,10 +8317,12 @@ function executePrint() {
     <div class="print-by-group">
       <div class="print-group-box">
         <div class="print-group-title">Distribusi Status</div>
-        ${mkBar('Done',        filtered.filter(w=>w.status==='Done').length,        total, '#4a9e3f')}
-        ${mkBar('In Progress', filtered.filter(w=>w.status==='In Progress').length, total, '#f0b429')}
-        ${mkBar('Open',        filtered.filter(w=>w.status==='Open').length,        total, '#2b6cb8')}
-        ${mkBar('Cancelled',   filtered.filter(w=>w.status==='Cancelled').length,   total, '#c0392b')}
+        ${mkBar('Done',                  filtered.filter(w=>w.status==='Done').length,                  total, '#4a9e3f')}
+        ${mkBar('In Progress',           filtered.filter(w=>w.status==='In Progress').length,           total, '#f0b429')}
+        ${mkBar('Open',                  filtered.filter(w=>w.status==='Open').length,                  total, '#2b6cb8')}
+        ${mkBar('Pending Verification',  filtered.filter(w=>w.status==='Pending Verification').length,  total, '#fb8c3a')}
+        ${mkBar('Rejected',              filtered.filter(w=>w.status==='Rejected').length,               total, '#8b3a3a')}
+        ${mkBar('Cancelled',             filtered.filter(w=>w.status==='Cancelled').length,               total, '#c0392b')}
       </div>
       <div class="print-group-box">
         <div class="print-group-title">Distribusi Prioritas</div>
@@ -8249,6 +8491,7 @@ function executePrint() {
         <div style="font-weight:500">${esc(w.title)}</div>
       </td>
       <td style="font-size:7.5pt">${esc(w.requestorName||'—')}${w.requestorDept?'<br><span style="font-size:7pt;color:#888">'+esc(w.requestorDept)+'</span>':''}</td>
+      <td style="font-size:7.5pt">${esc(w.type||'—')}</td>
       <td style="white-space:nowrap"><span class="pb ${priBadgeClass(w.priority)}">${w.priority}</span></td>
       <td><span class="pb ${statusBadgeClass(w.status)}">${w.status}</span></td>
       <td style="font-size:7.5pt;white-space:nowrap">${fmtDate(w.createdAt)}</td>
@@ -8270,7 +8513,7 @@ function executePrint() {
     <table class="print-table">
       <thead>
         <tr>
-          <th>No</th><th>Judul / Deskripsi</th><th>Requestor</th><th>Prioritas</th><th>Status</th>
+          <th>No</th><th>Judul / Deskripsi</th><th>Requestor</th><th>Kategori</th><th>Prioritas</th><th>Status</th>
           <th>Dibuat</th><th>Target</th><th>Unit</th><th>Area</th><th>Equipment</th><th>Teknisi</th>
           <th>Tgl Dikerjakan</th><th>Tgl Diselesaikan</th><th>Durasi</th><th>Overdue</th>
           ${optNotes ? '<th>Catatan</th>' : ''}
@@ -8384,6 +8627,7 @@ async function exportPrintExcel() {
     const done     = filtered.filter(w => w.status === 'Done').length;
     const inProg   = filtered.filter(w => w.status === 'In Progress').length;
     const open     = filtered.filter(w => w.status === 'Open').length;
+    const pendingVerif = filtered.filter(w => w.status === 'Pending Verification').length;
     const rate     = total ? Math.round(done / total * 100) : 0;
     const avgHoursVal = (() => {
       const doneWO = filtered.filter(w => w.status === 'Done' && parseFloat(w.actualHours) > 0);
@@ -8397,6 +8641,7 @@ async function exportPrintExcel() {
       ['In Progress', filtered.filter(w=>w.status==='In Progress').length, 'FFF0B429'],
       ['Open',        filtered.filter(w=>w.status==='Open').length,        'FF2B6CB8'],
       ['Cancelled',   filtered.filter(w=>w.status==='Cancelled').length,   'FFC0392B'],
+      ['Pending Verification',   filtered.filter(w=>w.status==='Pending Verification').length,   'FFC0394B'],
     ];
     const distPriority = [
       ['High',   filtered.filter(w=>w.priority==='High').length,   'FFFB8C3A'],
@@ -8469,6 +8714,7 @@ async function exportPrintExcel() {
         ['Selesai', done],
         ['Completion Rate', rate + '%'],
         ['In Progress', inProg],
+        ['Pending Verification', pendingVerif],
         ['Avg Durasi', avgHoursVal ? avgHoursVal + ' jam' : '—'],
       ];
       kpis.forEach((k, i) => {
@@ -8546,7 +8792,7 @@ async function exportPrintExcel() {
       sheet.getCell(`A${r}`).border = { bottom: { style: 'thin', color: { argb: GREEN } } };
       r++;
 
-      const headers = ['No','Judul / Deskripsi','Requestor','Prioritas','Status','Dibuat','Target','Unit','Area','Equipment','Teknisi','Tgl Dikerjakan','Tgl Diselesaikan','Durasi','Overdue'];
+      const headers = ['No','Judul / Deskripsi','Requestor','Kategori','Prioritas','Status','Dibuat','Target','Unit','Area','Equipment','Teknisi','Tgl Dikerjakan','Tgl Diselesaikan','Durasi','Overdue'];
       if (optNotes) headers.push('Catatan');
       const headerRow = sheet.getRow(r);
       headers.forEach((h, i) => {
@@ -8582,6 +8828,7 @@ async function exportPrintExcel() {
           idx + 1,
           `${w.id} — ${w.title}`,
           `${w.requestorName||'—'}${w.requestorDept?' · '+w.requestorDept:''}`,
+          w.type || '—',
           w.priority || '—',
           w.status || '—',
           fmtDate(w.createdAt),
@@ -8632,19 +8879,20 @@ async function exportPrintExcel() {
       sheet.getColumn('A').width = 6;   // No
       sheet.getColumn('B').width = 36;  // Judul / Deskripsi
       sheet.getColumn('C').width = 18;  // Requestor
-      sheet.getColumn('D').width = 11;  // Prioritas
-      sheet.getColumn('E').width = 12;  // Status
-      sheet.getColumn('F').width = 12;  // Dibuat
-      sheet.getColumn('G').width = 12;  // Target
-      sheet.getColumn('H').width = 12;  // Unit
-      sheet.getColumn('I').width = 14;  // Area
-      sheet.getColumn('J').width = 16;  // Equipment
-      sheet.getColumn('K').width = 16;  // Teknisi
-      sheet.getColumn('L').width = 13;  // Tgl Dikerjakan
-      sheet.getColumn('M').width = 13;  // Tgl Diselesaikan
-      sheet.getColumn('N').width = 10;  // Durasi
-      sheet.getColumn('O').width = 16;  // Overdue
-      if (optNotes) sheet.getColumn('P').width = 30;
+      sheet.getColumn('D').width = 16;  // Kategori
+      sheet.getColumn('E').width = 11;  // Prioritas
+      sheet.getColumn('F').width = 12;  // Status
+      sheet.getColumn('G').width = 12;  // Dibuat
+      sheet.getColumn('H').width = 12;  // Target
+      sheet.getColumn('I').width = 12;  // Unit
+      sheet.getColumn('J').width = 14;  // Area
+      sheet.getColumn('K').width = 16;  // Equipment
+      sheet.getColumn('L').width = 16;  // Teknisi
+      sheet.getColumn('M').width = 13;  // Tgl Dikerjakan
+      sheet.getColumn('N').width = 13;  // Tgl Diselesaikan
+      sheet.getColumn('O').width = 10;  // Durasi
+      sheet.getColumn('P').width = 16;  // Overdue
+      if (optNotes) sheet.getColumn('Q').width = 30;
     }
 
     // ── Trigger download ──
@@ -9032,9 +9280,13 @@ const all = selectedUnit === 'all'
         dateLabel: null,
         monthIdx: idx,
         year,
-        masuk:    inList.length,
-        selesai:  doneList.length,
-        backlog:  inList.filter(w => w.status === 'Open' || w.status === 'In Progress').length,
+        masuk:        inList.length,
+        selesai:      doneList.length,
+        backlog:      inList.filter(w => w.status === 'Open' || w.status === 'In Progress').length,
+        open:         inList.filter(w => w.status === 'Open' || w.status === 'In Progress').length,
+        pendingVerif: inList.filter(w => w.status === 'Pending Verification').length,
+        cancelled:    inList.filter(w => w.status === 'Cancelled').length,
+        rejected:     inList.filter(w => w.status === 'Rejected').length,
         highPri,
         avgHours: avgH,
       };
@@ -9056,7 +9308,7 @@ const all = selectedUnit === 'all'
 
     const weeksMap = {};
     [...weeksInMonth].forEach(wk => {
-      weeksMap[wk] = { masuk:0, selesai:0, backlog:0, highPri:0, hours:[] };
+      weeksMap[wk] = { masuk:0, selesai:0, backlog:0, pendingVerif:0, cancelled:0, rejected:0, highPri:0, hours:[] };
     });
 
     all.forEach(w => {
@@ -9067,6 +9319,9 @@ const all = selectedUnit === 'all'
       weeksMap[wk].masuk++;
       if (w.status === 'Done') weeksMap[wk].selesai++;
       if (w.status === 'Open' || w.status === 'In Progress') weeksMap[wk].backlog++;
+      if (w.status === 'Pending Verification') weeksMap[wk].pendingVerif++;
+      if (w.status === 'Cancelled') weeksMap[wk].cancelled++;
+      if (w.status === 'Rejected') weeksMap[wk].rejected++;
       if (w.priority === 'High' || w.priority === 'Critical') weeksMap[wk].highPri++;
       if (parseFloat(w.actualHours) > 0) weeksMap[wk].hours.push(parseFloat(w.actualHours));
     });
@@ -9083,6 +9338,7 @@ const all = selectedUnit === 'all'
         monthName: MONTHS_ID[selectedMonth],
         year,
         masuk: r.masuk, selesai: r.selesai, backlog: r.backlog,
+        open: r.backlog, pendingVerif: r.pendingVerif, cancelled: r.cancelled, rejected: r.rejected,
         highPri: r.highPri, avgHours: avgH,
       };
     });
@@ -9095,10 +9351,13 @@ const all = selectedUnit === 'all'
       const d = new Date(w.createdAt);
       if (d.getFullYear() !== year) return;
       const wk = getWeekNumber(d);
-      if (!weeksMap[wk]) weeksMap[wk] = { label: 'W'+wk, masuk:0, selesai:0, backlog:0, highPri:0, hours:[], count:0 };
+      if (!weeksMap[wk]) weeksMap[wk] = { label: 'W'+wk, masuk:0, selesai:0, backlog:0, pendingVerif:0, cancelled:0, rejected:0, highPri:0, hours:[], count:0 };
       weeksMap[wk].masuk++;
       if (w.status === 'Done') weeksMap[wk].selesai++;
       if (w.status === 'Open' || w.status === 'In Progress') weeksMap[wk].backlog++;
+      if (w.status === 'Pending Verification') weeksMap[wk].pendingVerif++;
+      if (w.status === 'Cancelled') weeksMap[wk].cancelled++;
+      if (w.status === 'Rejected') weeksMap[wk].rejected++;
       if (w.priority === 'High' || w.priority === 'Critical') weeksMap[wk].highPri++;
       if (parseFloat(w.actualHours) > 0) weeksMap[wk].hours.push(parseFloat(w.actualHours));
     });
@@ -9112,6 +9371,7 @@ const all = selectedUnit === 'all'
         weekNum: parseInt(wk),
         year,
         masuk: r.masuk, selesai: r.selesai, backlog: r.backlog,
+        open: r.backlog, pendingVerif: r.pendingVerif, cancelled: r.cancelled, rejected: r.rejected,
         highPri: r.highPri, avgHours: avgH,
       };
     });
@@ -9167,7 +9427,7 @@ function renderComparison() {
     ? WO.workorders
     : WO.workorders.filter(w => w.unitId === selectedUnit);
   const backlog = filteredWO.filter(w =>
-    (w.status === 'Open' || w.status === 'In Progress') &&
+    w.status === 'Pending Verification' &&
     new Date(w.createdAt).getFullYear() <= year
   ).length;
 
@@ -9470,58 +9730,30 @@ function drawComparisonChart(periods) {
 }
 
 function _buildChart(canvas, periods) {
-  const labels   = periods.map(p => p.label);
-  const masukData   = periods.map(p => p.masuk);
-  const selesaiData = periods.map(p => p.selesai);
+  const labels = periods.map(p => p.label);
 
-  // Hitung cumulative backlog
-  let cum = 0;
-  const backlogData = periods.map(p => {
-    cum += (p.masuk - p.selesai);
-    return Math.max(0, cum);
-  });
+  const SERIES = [
+    { key: 'masuk',        label: 'WO Masuk',            color: '#2b6cb8' },
+    { key: 'selesai',      label: 'WO Selesai',          color: '#4a9e3f' },
+    { key: 'open',         label: 'WO Open',             color: '#fb8c3a' },
+    { key: 'pendingVerif', label: 'Pending Verifikasi',  color: '#b88ff7' },
+    { key: 'cancelled',    label: 'Cancelled',           color: '#8891a8' },
+    { key: 'rejected',     label: 'Rejected',            color: '#c0392b' },
+  ];
+
+  const datasets = SERIES.map(s => ({
+    label: s.label,
+    data: periods.map(p => p[s.key] || 0),
+    backgroundColor: s.color + 'BF', // ~75% opacity
+    borderColor: s.color,
+    borderWidth: 1.5,
+    borderRadius: 4,
+  }));
 
   const ctx = canvas.getContext('2d');
   _cmpChartInstance = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'WO Masuk',
-          data: masukData,
-          backgroundColor: 'rgba(43,108,184,0.75)',
-          borderColor: '#2b6cb8',
-          borderWidth: 1.5,
-          borderRadius: 4,
-          order: 2,
-        },
-        {
-          label: 'WO Selesai',
-          data: selesaiData,
-          backgroundColor: 'rgba(74,158,63,0.75)',
-          borderColor: '#4a9e3f',
-          borderWidth: 1.5,
-          borderRadius: 4,
-          order: 2,
-        },
-        {
-          label: 'WO Tertunda (Kumulatif)',
-          data: backlogData,
-          type: 'line',
-          borderColor: '#fb8c3a',
-          backgroundColor: 'rgba(251,140,58,0.12)',
-          borderWidth: 2.5,
-          pointBackgroundColor: '#fb8c3a',
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          fill: true,
-          tension: 0.35,
-          order: 1,
-          yAxisID: 'y2',
-        },
-      ],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
       maintainAspectRatio: true,
@@ -9531,24 +9763,21 @@ function _buildChart(canvas, periods) {
           display: true,
           position: 'top',
           labels: {
-            font: { family: "'IBM Plex Mono', monospace", size: 11 },
+            font: { family: "'IBM Plex Mono', monospace", size: 10.5 },
             color: '#3a5a3a',
-            padding: 16,
+            padding: 14,
+            boxWidth: 12,
           },
         },
         tooltip: {
           callbacks: {
-            label: ctx => {
-              if (ctx.datasetIndex === 2) return ` Backlog: ${ctx.parsed.y} WO`;
-              return ` ${ctx.dataset.label}: ${ctx.parsed.y} WO`;
-            },
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} WO`,
             afterBody: (items) => {
-              const idx  = items[0]?.dataIndex;
+              const idx = items[0]?.dataIndex;
               if (idx === undefined) return [];
-              const m = masukData[idx];
-              const s = selesaiData[idx];
-              const cr = m ? Math.round(s / m * 100) : 0;
-              return [`Completion Rate: ${m ? cr + '%' : '—'}`];
+              const p  = periods[idx];
+              const cr = p.masuk ? Math.round(p.selesai / p.masuk * 100) : 0;
+              return [`Completion Rate: ${p.masuk ? cr + '%' : '—'}`];
             },
           },
           backgroundColor: '#1a3a6b',
@@ -9573,19 +9802,9 @@ function _buildChart(canvas, periods) {
             font: { family: "'IBM Plex Mono', monospace", size: 11 },
             color: '#7a9a7a',
             stepSize: 1,
+            precision: 0,
           },
           title: { display: true, text: 'Jumlah WO', font: { size: 11 }, color: '#7a9a7a' },
-        },
-        y2: {
-          position: 'right',
-          beginAtZero: true,
-          grid: { drawOnChartArea: false },
-          ticks: {
-            font: { family: "'IBM Plex Mono', monospace", size: 11 },
-            color: '#fb8c3a',
-            stepSize: 1,
-          },
-          title: { display: true, text: 'Backlog', font: { size: 11 }, color: '#fb8c3a' },
         },
       },
     },
