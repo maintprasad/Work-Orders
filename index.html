@@ -2313,6 +2313,47 @@ const CFG = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// LOGIN PREFETCH — mulai ambil data user di BACKGROUND begitu file
+// ini dieksekusi (sebelum user sempat klik tombol MASUK). Dengan ini,
+// saat user selesai mengetik username & password, data kemungkinan
+// besar sudah tersedia sehingga proses login terasa instan.
+// Timeout dinaikkan + diberi 1x retry karena GAS butuh 15–25 detik
+// saat cold start (lihat juga PULL.backoff di bagian pullAllFromAPI).
+// ═══════════════════════════════════════════════════════════════
+let LOGIN_PREFETCH_PROMISE = null;
+
+function fetchUsersFromServer(timeoutMs) {
+  return fetch(CFG.apiUrl + '?fn=login', {
+    mode: 'cors',
+    signal: AbortSignal.timeout(timeoutMs),
+  }).then(r => r.json());
+}
+
+async function startLoginPrefetch() {
+  try {
+    const d = await fetchUsersFromServer(20000); // percobaan 1: 20 detik
+    if (d.ok && d.data && Array.isArray(d.data.users) && d.data.users.length) {
+      saveUsers(d.data.users);
+      return { users: d.data.users, online: true };
+    }
+    return { users: loadUsers(), online: false };
+  } catch (e1) {
+    try {
+      const d2 = await fetchUsersFromServer(25000); // retry: 25 detik (GAS cold start)
+      if (d2.ok && d2.data && Array.isArray(d2.data.users) && d2.data.users.length) {
+        saveUsers(d2.data.users);
+        return { users: d2.data.users, online: true };
+      }
+      return { users: loadUsers(), online: false };
+    } catch (e2) {
+      return { users: loadUsers(), online: false };
+    }
+  }
+}
+
+LOGIN_PREFETCH_PROMISE = startLoginPrefetch();
+
+// ═══════════════════════════════════════════════════════════════
 // DATA STORE
 // ═══════════════════════════════════════════════════════════════
 let WO = { workorders: [], technicians: [] };
@@ -6512,45 +6553,52 @@ async function doLogin() {
 
   if (!username || !password) { errEl.textContent = 'Username dan password wajib diisi'; return; }
 
-  loginBtn.textContent = 'Memverifikasi...';
-  loginBtn.disabled = true;
+  errEl.style.color = '';
   errEl.textContent = '';
+  loginBtn.disabled = true;
 
-  // Coba ambil fresh dari Sheets — Sheets adalah sumber utama user
-  let users = [];
-  let isOffline = false;
+  // Feedback berjalan (bukan diam) supaya terasa responsif meski GAS lambat
+  let elapsed = 0;
+  loginBtn.textContent = 'Menghubungkan...';
+  const tickTimer = setInterval(() => {
+    elapsed++;
+    loginBtn.textContent = elapsed < 8
+      ? 'Menghubungkan...'
+      : `Menghubungkan... (${elapsed}s)`;
+  }, 1000);
+
+  // Pakai promise prefetch yang SUDAH berjalan sejak halaman dimuat —
+  // tidak membuat request baru dari nol, sehingga jauh lebih cepat.
+  let result;
   try {
-    const r = await fetch(CFG.apiUrl + '?fn=read', { mode:'cors', signal: AbortSignal.timeout(10000) });
-    const d = await r.json();
-    if (d.ok && d.data && Array.isArray(d.data.users) && d.data.users.length) {
-      users = d.data.users;
-      saveUsers(users); // update cache lokal
-    } else {
-      // Sheets WO_USERS kosong atau tidak ada — pakai cache lokal
-      users = loadUsers();
-      isOffline = !d.ok;
-    }
+    result = await LOGIN_PREFETCH_PROMISE;
   } catch {
-    // Offline — pakai cache lokal
-    users = loadUsers();
-    isOffline = true;
+    result = { users: loadUsers(), online: false };
   }
 
+  clearInterval(tickTimer);
   loginBtn.textContent = 'MASUK →';
   loginBtn.disabled = false;
 
-  // Jika users masih kosong (offline + belum ada cache), tampilkan pesan jelas
+  const { users, online } = result;
+
+  // Kalau percobaan barusan gagal terhubung, siapkan ulang prefetch
+  // di background supaya klik "MASUK" berikutnya punya kesempatan baru
+  // tanpa harus reload halaman.
+  if (!online) {
+    LOGIN_PREFETCH_PROMISE = startLoginPrefetch();
+  }
+
   if (!users.length) {
-    if (isOffline) {
-      errEl.textContent = '⚠ Tidak dapat terhubung ke server dan belum ada data tersimpan. Pastikan terhubung internet untuk login pertama kali.';
+    if (!online) {
+      errEl.textContent = '⚠ Tidak dapat terhubung ke server dan belum ada data tersimpan. Periksa koneksi internet, lalu tekan MASUK sekali lagi.';
     } else {
       errEl.textContent = '⚠ Belum ada user terdaftar. Hubungi Administrator.';
     }
     return;
   }
 
-  // Tampilkan pesan kecil jika mode offline
-  if (isOffline) {
+  if (!online) {
     errEl.style.color = 'var(--accent)';
     errEl.textContent = '⚠ Mode offline — menggunakan data tersimpan';
     setTimeout(() => { errEl.textContent = ''; errEl.style.color = ''; }, 3000);
@@ -6576,7 +6624,6 @@ async function doLogin() {
   document.getElementById('login-screen').style.display = 'none';
 
   if (needsUnitSelector(SESSION.role)) {
-    // Tampilkan unit selector sebelum masuk
     showUnitSelector();
   } else {
     applyRoleUI();
