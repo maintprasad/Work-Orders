@@ -2307,6 +2307,10 @@ document.addEventListener('touchmove', function(e) {
 const CFG = {
   apiUrl:          'https://script.google.com/macros/s/AKfycbzXy2nZ4JD3vJI-h0dplBBk2IDYvOOTb4IK8_gRINaIHUPM19NlVr7gqJqNwHFVK44K/exec',
   equipDbApi:      'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
+  // URL backend MaintWare (Warehouse) — WAJIB sama dengan konstanta API_URL
+  // di file HTML MaintWare, supaya Parts Picker baca stok live & benar-benar
+  // mengurangi stok asli di sheet ITEMS_DB milik MaintWare.
+  maintwareApiUrl: 'https://script.google.com/macros/s/AKfycbxWC3esNUKacXKDx1cGqzrtaaH0vKW4pbsVV6_zmUj5jSXBTP2aZLJ73X6M9vW9W3ro/exec',
   storageKey:      'wo_data_v1',
   equipDbKey:      'edb_data',
   itemsDbKey:      'items_db_cache',
@@ -4364,9 +4368,9 @@ async function openPartsPicker(woId) {
   renderPartsPicker();
   document.getElementById('modal-parts-picker').classList.add('open');
 
-  // Fetch fresh dari ITEMS_DB di background
+  // Fetch fresh dari ITEMS_DB MaintWare di background
   try {
-    const r = await fetch(CFG.apiUrl + '?action=getItems', {
+    const r = await fetch(CFG.maintwareApiUrl + '?action=getItems', {
       mode: 'cors', signal: AbortSignal.timeout(15000),
     });
     const d = await r.json();
@@ -4375,7 +4379,7 @@ async function openPartsPicker(woId) {
       renderPartsPicker(); // refresh list dengan data terbaru
     }
   } catch(e) {
-    console.warn('[PartsPicker] Gagal fetch ITEMS_DB:', e.message);
+    console.warn('[PartsPicker] Gagal fetch ITEMS_DB dari MaintWare:', e.message);
     // Tetap tampilkan dari cache
   }
 }
@@ -4463,41 +4467,47 @@ async function confirmPickPart() {
   const btn = event?.target;
   if (btn) btn.disabled = true;
 
-  // ── Update stok ITEMS_DB via GET (lebih reliable di GAS CORS) ──
+  // ── Update stok ITEMS_DB milik MaintWare via GET + _body — pola ini
+  //    sengaja mengikuti cara app MaintWare sendiri memanggil updateStock
+  //    (menghindari isu CORS preflight khusus action ini di GAS) ──
   try {
     const stockBody = {
-      action:   'updateStock',
-      itemCode: PP_SELECTED.partId,
-      txType:   'OUT',
-      quantity: qty,
-      pic:      SESSION?.nama || 'WO System',
-      notes:    'WO: ' + woId,
-      woId:     woId,
+      action:    'updateStock',
+      itemCode:  PP_SELECTED.partId,
+      txType:    'OUT',
+      quantity:  qty,
+      pic:       SESSION?.nama || 'WO System',
+      notes:     'WO: ' + woId + (wo.title ? ' — ' + wo.title : ''),
+      woId:      woId,
+      // Konteks unit/area/equipment dari WO, supaya pemakaian ini ikut
+      // terhitung di dashboard Top Area / Top Equipment MaintWare
+      unitId:    wo.unitId  || '',
+      areaId:    wo.areaId  || '',
+      equipId:   wo.equipId || '',
+      unitName:  wo.unitId  ? (getUnitName(wo.unitId)   || '') : '',
+      areaName:  wo.areaId  ? (getAreaName(wo.areaId)   || '') : '',
+      equipName: wo.equipId ? (getEquipName(wo.equipId) || '') : '',
     };
 
-    const resp   = await fetch(CFG.apiUrl, {
-      method:  'POST',
-      mode:    'cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify(stockBody),
-      signal:  AbortSignal.timeout(20000),
-    });
+    const url  = CFG.maintwareApiUrl + '?action=updateStock&_body=' + encodeURIComponent(JSON.stringify(stockBody));
+    const resp = await fetch(url, { signal: AbortSignal.timeout(20000) });
     const result = await resp.json();
 
     if (!result.success) {
-      toast('❌ GAS error: ' + (result.message || 'Gagal update stok'), 'error');
+      toast('❌ MaintWare error: ' + (result.message || 'Gagal update stok'), 'error');
       if (btn) btn.disabled = false;
       return;
     }
 
-    // Update cache lokal pakai stockAfter dari GAS
+    // Update cache lokal pakai stockAfter dari GAS MaintWare
     const newStock = String(result.stockAfter ?? Math.max(0, curStock - qty));
     if (rawItem)   { rawItem.stock   = newStock; saveItemsDbCache(ITEMS_DB_CACHE); }
     if (localPart) { localPart.stock = newStock; }
 
   } catch (e) {
-    console.warn('[PartsPicker] Gagal update stok:', e.message);
-    // Optimistic update jika GAS tidak bisa dicapai
+    console.warn('[PartsPicker] Gagal update stok ke MaintWare:', e.message);
+    toast('⚠ Gagal sinkron stok ke Warehouse (MaintWare). Cek koneksi / CFG.maintwareApiUrl.', 'error');
+    // Optimistic update lokal saja — TIDAK mengubah stok asli di MaintWare
     const fallback = String(Math.max(0, curStock - qty));
     if (rawItem)   { rawItem.stock   = fallback; saveItemsDbCache(ITEMS_DB_CACHE); }
     if (localPart) { localPart.stock = fallback; }
