@@ -5097,7 +5097,35 @@ const SYNC = {
   failCounts:  {},      // key -> berapa kali item ini gagal berturut-turut
   retryTimer:  null,
   _retryAttempt: 0,
+  _tokenRefreshInFlight: false,
 };
+
+// Refresh token sesi secara diam-diam pakai kredensial yang sudah tersimpan
+// di cache lokal (users di localStorage ikut menyimpan password, karena
+// Sheets menyimpannya plain text). Dipanggil otomatis saat backend menolak
+// upsert/delete karena token kosong/expired — supaya user TIDAK perlu
+// login ulang manual di tengah sesi kerja yang panjang.
+async function refreshSessionToken() {
+  if (!SESSION || !SESSION.username) return false;
+  const cachedUser = loadUsers().find(u => u.username === SESSION.username && u.status === 'Active');
+  if (!cachedUser || !cachedUser.password) return false;
+  try {
+    const resp = await fetch(
+      CFG.apiUrl + '?fn=login&username=' + encodeURIComponent(cachedUser.username) + '&password=' + encodeURIComponent(cachedUser.password),
+      { mode: 'cors', signal: AbortSignal.timeout(15000) }
+    );
+    const data = await resp.json();
+    if (data.success && data.token) {
+      SESSION.token = data.token;
+      localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
+      console.log('[refreshSessionToken] Token berhasil diperbarui otomatis');
+      return true;
+    }
+  } catch (e) {
+    console.warn('[refreshSessionToken] Gagal:', e.message);
+  }
+  return false;
+}
 
 // Tandai WO perlu di-sync (dipanggil setelah setiap perubahan)
 function queueSyncWO(wo) {
@@ -5150,13 +5178,29 @@ async function flushQueue() {
         anyFailed = true;
         const msg = e?.message || '';
 
-        // Error auth (token kosong/expired) TIDAK AKAN PERNAH sembuh dengan
-        // diulang-ulang — user wajib login ulang dulu. Hentikan retry item
-        // ini, tampilkan sekali, dan paksa ke layar login supaya dapat token baru.
+        // Error auth (token kosong/expired) — coba refresh token secara
+        // diam-diam dulu pakai kredensial yang sudah tersimpan di cache
+        // lokal. Kalau berhasil, item dikembalikan ke antrean untuk dicoba
+        // lagi otomatis dengan token baru (user tidak perlu login manual).
+        // Hanya kalau refresh JUGA gagal, baru paksa logout.
         if (/token/i.test(msg)) {
-          toast('⚠ Sesi login sudah tidak valid, sehingga perubahan tidak bisa disimpan ke server. Silakan login ulang.', 'error');
+          if (!SYNC._tokenRefreshInFlight) {
+            SYNC._tokenRefreshInFlight = true;
+            const refreshed = await refreshSessionToken();
+            SYNC._tokenRefreshInFlight = false;
+            if (refreshed) {
+              SYNC.queue[key] = item;
+              continue;
+            }
+          } else {
+            // Refresh sedang diproses oleh item lain di batch ini —
+            // masukkan lagi item ini, akan ikut dicoba di flush berikutnya
+            SYNC.queue[key] = item;
+            continue;
+          }
+          toast('⚠ Sesi login sudah tidak valid dan gagal diperbarui otomatis. Silakan login ulang.', 'error');
           setTimeout(() => { if (confirm('Sesi login expired. Login ulang sekarang?')) doLogout(); }, 300);
-          continue; // jangan masukkan lagi ke queue — biar tidak diulang percuma
+          continue;
         }
 
         const failCount = (SYNC.failCounts[key] || 0) + 1;
@@ -5164,7 +5208,8 @@ async function flushQueue() {
         if (failCount >= 5) {
           // Item ini gagal berkali-kali (kemungkinan payload bermasalah).
           // Hentikan auto-retry item ini saja supaya tidak menyandera
-          // item lain di queue selamanya, dan beri tahu user secara jelas.
+          // item lain di queue selamanya, dan beri tahu user secara jelas
+          // termasuk PESAN ERROR ASLI dari server supaya mudah didiagnosis.
           toast(`⚠ Gagal sync setelah ${failCount}x percobaan (${key}): ${msg || 'error tidak diketahui'}. Buka WO tersebut, edit sedikit, lalu simpan lagi.`, 'error');
         } else if (!(key in SYNC.queue)) {
           SYNC.queue[key] = item;
