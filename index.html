@@ -2305,7 +2305,7 @@ document.addEventListener('touchmove', function(e) {
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
-  apiUrl:          'https://script.google.com/macros/s/AKfycbw6AOeGhZ-KMVudXzUfjM6p8DdPPPU0FPMjRIy7GdIKoAe9YIIokpE6inXlfEqWBgGsWg/exec',
+  apiUrl:          'https://script.google.com/macros/s/AKfycbwlVll7bjKc9rXWHWSTO7sI0M0zlfhS7AdSZ4EB9PxzalPf6MKd1ochj_s73GyTYYB7mg/exec',
   equipDbApi:      'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
   // URL backend MaintWare (Warehouse) — WAJIB sama dengan konstanta API_URL
   // di file HTML MaintWare, supaya Parts Picker baca stok live & benar-benar
@@ -5094,6 +5094,9 @@ const SYNC = {
   inFlight:    false,
   online:      true,
   pendingCount: 0,
+  failCounts:  {},      // key -> berapa kali item ini gagal berturut-turut
+  retryTimer:  null,
+  _retryAttempt: 0,
 };
 
 // Tandai WO perlu di-sync (dipanggil setelah setiap perubahan)
@@ -5119,7 +5122,8 @@ function scheduleFlush() {
   SYNC.timer = setTimeout(flushQueue, SYNC.debounceMs);
 }
 
-// Proses semua item di queue
+// Proses semua item di queue — tiap item independen, supaya satu item
+// yang terus gagal tidak menyandera item lain selamanya
 async function flushQueue() {
   if (SYNC.inFlight || Object.keys(SYNC.queue).length === 0) return;
   SYNC.inFlight = true;
@@ -5127,34 +5131,51 @@ async function flushQueue() {
 
   const batch = { ...SYNC.queue };
   SYNC.queue  = {};
+  let anyFailed = false;
 
   try {
     for (const key of Object.keys(batch)) {
       const item = batch[key];
-      if (item.type === 'upsert_wo') {
-        await _fetchSilent(CFG.apiUrl, { fn: 'upsert', sheet: 'WO_ORDERS', row: item.data });
-      } else if (item.type === 'delete_wo') {
-        await _fetchSilent(CFG.apiUrl, { fn: 'delete', sheet: 'WO_ORDERS', id: item.id });
-      } else if (item.type === 'upsert_tech') {
-        await _fetchSilent(CFG.apiUrl, { fn: 'upsert', sheet: 'WO_TECHNICIANS', row: item.data });
+      try {
+        if (item.type === 'upsert_wo') {
+          await _fetchSilent(CFG.apiUrl, { fn: 'upsert', sheet: 'WO_ORDERS', row: item.data });
+        } else if (item.type === 'delete_wo') {
+          await _fetchSilent(CFG.apiUrl, { fn: 'delete', sheet: 'WO_ORDERS', id: item.id });
+        } else if (item.type === 'upsert_tech') {
+          await _fetchSilent(CFG.apiUrl, { fn: 'upsert', sheet: 'WO_TECHNICIANS', row: item.data });
+        }
+        // sukses — reset counter kegagalan item ini
+        delete SYNC.failCounts[key];
+      } catch (e) {
+        anyFailed = true;
+        const failCount = (SYNC.failCounts[key] || 0) + 1;
+        SYNC.failCounts[key] = failCount;
+        if (failCount >= 5) {
+          // Item ini gagal berkali-kali (kemungkinan payload bermasalah).
+          // Hentikan auto-retry item ini saja supaya tidak menyandera
+          // item lain di queue selamanya, dan beri tahu user secara jelas.
+          toast(`⚠ Gagal sync setelah ${failCount}x percobaan (${key}). Buka WO tersebut, edit sedikit, lalu simpan lagi.`, 'error');
+        } else if (!(key in SYNC.queue)) {
+          SYNC.queue[key] = item;
+        }
       }
     }
-    SYNC.online = true;
-    updateSyncBadge('ok');
-  } catch {
-    // Gagal — kembalikan ke queue untuk retry, TANPA menimpa perubahan baru
-    // yang mungkin sudah masuk ke queue selagi request ini berjalan
-    for (const key of Object.keys(batch)) {
-      if (!(key in SYNC.queue)) SYNC.queue[key] = batch[key];
-    }
-    SYNC.online = false;
-    updateSyncBadge('err');
-    // Retry otomatis dalam 10 detik
-    setTimeout(flushQueue, 10000);
+    SYNC.online = !anyFailed;
+    updateSyncBadge(anyFailed ? 'err' : 'ok');
   } finally {
     SYNC.inFlight = false;
-    // Kalau ada item baru masuk saat in-flight, flush lagi
-    if (Object.keys(SYNC.queue).length > 0) scheduleFlush();
+    if (Object.keys(SYNC.queue).length > 0) {
+      // Backoff bertingkat (8s, 13s, 20s, ... maks 60s) supaya tidak
+      // terus membanjiri server yang sedang bermasalah
+      SYNC._retryAttempt = anyFailed ? (SYNC._retryAttempt || 0) + 1 : 0;
+      const delayMs = anyFailed
+        ? Math.min(60000, 8000 * Math.pow(1.6, Math.min(SYNC._retryAttempt, 6)))
+        : SYNC.debounceMs;
+      if (SYNC.retryTimer) clearTimeout(SYNC.retryTimer);
+      SYNC.retryTimer = setTimeout(flushQueue, delayMs);
+    } else {
+      SYNC._retryAttempt = 0;
+    }
   }
 }
 
