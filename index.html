@@ -2504,7 +2504,7 @@ async function pullAllFromAPI(isRetry = false) {
         const freshUser = loadUsers().find(u => u.id === SESSION.userId && u.status === 'Active');
         if (freshUser) {
           SESSION = { userId:freshUser.id, username:freshUser.username,
-            nama:freshUser.nama, role:freshUser.role, jabatan:freshUser.jabatan||'' };
+            nama:freshUser.nama, role:freshUser.role, jabatan:freshUser.jabatan||'', token: SESSION.token || '' };
           localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
           document.getElementById('user-display-name').textContent = SESSION.nama;
           document.getElementById('user-display-role').textContent =
@@ -5219,11 +5219,17 @@ async function _fetchSilent(url, body) {
   const controller = new AbortController();
   const timeout    = setTimeout(() => controller.abort(), 15000);
   try {
+    // Auto-sisipkan token sesi untuk endpoint yang butuh requireAuth() di backend
+    // (upsert/delete/write) — tanpa ini backend selalu menolak & sync macet "pending".
+    const needsAuth  = ['upsert', 'delete', 'write'].includes(body.fn);
+    const finalBody  = (needsAuth && !body.token)
+      ? { ...body, token: SESSION?.token || '' }
+      : body;
     const r = await fetch(url, {
       method:  'POST',
       mode:    'cors',
       headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify(body),
+      body:    JSON.stringify(finalBody),
       signal:  controller.signal,
     });
     const d = await r.json();
@@ -6628,7 +6634,22 @@ async function doLogin() {
     return;
   }
 
-  SESSION = { userId:user.id, username:user.username, nama:user.nama, role:user.role, jabatan:user.jabatan||'' };
+  // Ambil token sesi asli dari backend — dipakai backend untuk requireAuth()
+  // di endpoint upsert/delete/write. Tanpa ini SEMUA simpan/update WO akan
+  // selalu ditolak backend dan status sync macet di "pending" terus.
+  let sessionToken = '';
+  try {
+    const tokResp = await fetch(
+      CFG.apiUrl + '?fn=login&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+      { mode: 'cors', signal: AbortSignal.timeout(15000) }
+    );
+    const tokData = await tokResp.json();
+    if (tokData.success && tokData.token) sessionToken = tokData.token;
+  } catch (e) {
+    console.warn('[doLogin] Gagal ambil token sesi (mode offline?):', e.message);
+  }
+
+  SESSION = { userId:user.id, username:user.username, nama:user.nama, role:user.role, jabatan:user.jabatan||'', token: sessionToken };
   localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
 
   document.getElementById('login-screen').style.display = 'none';
@@ -6668,6 +6689,7 @@ function checkSession() {
   if (!stored) return false;
   try {
     SESSION = JSON.parse(stored);
+    const prevToken = SESSION?.token || ''; // simpan token lama sebelum SESSION di-rebuild
     // Bersihkan sisa pilihan unit lama — fitur unit selector dinonaktifkan
     if (SESSION && SESSION.selectedUnit) {
       delete SESSION.selectedUnit;
@@ -6684,7 +6706,7 @@ function checkSession() {
     }
     const user = users.find(u => u.id === SESSION.userId && u.status === 'Active');
     if (user) {
-      SESSION = { userId:user.id, username:user.username, nama:user.nama, role:user.role, jabatan:user.jabatan||'' };
+      SESSION = { userId:user.id, username:user.username, nama:user.nama, role:user.role, jabatan:user.jabatan||'', token: prevToken };
       return true;
     }
     // User tidak ditemukan di cache — session mungkin sudah expired atau dihapus admin
