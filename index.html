@@ -2305,7 +2305,7 @@ document.addEventListener('touchmove', function(e) {
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
-  apiUrl:          'https://script.google.com/macros/s/AKfycbyO6aNKup-IlpWJpvYctzriclf2mg5Gqv2z9RtNmKYx5atHPNDthi88NLZiOCXseRkDFQ/exec',
+  apiUrl:          'https://script.google.com/macros/s/AKfycbwlVll7bjKc9rXWHWSTO7sI0M0zlfhS7AdSZ4EB9PxzalPf6MKd1ochj_s73GyTYYB7mg/exec',
   equipDbApi:      'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
   // URL backend MaintWare (Warehouse) — WAJIB sama dengan konstanta API_URL
   // di file HTML MaintWare, supaya Parts Picker baca stok live & benar-benar
@@ -5217,7 +5217,13 @@ async function manualSync() {
 // Internal: fire-and-forget fetch dengan timeout
 async function _fetchSilent(url, body) {
   const controller = new AbortController();
-  const timeout    = setTimeout(() => controller.abort(), 15000);
+  // Upsert/delete/write ke WO_ORDERS (terutama saat menutup/verifikasi WO
+  // dengan checklist, foto, dan lampiran lengkap) bisa lebih lama diproses
+  // GAS karena LockService + operasi sheet bulanan. 15 detik sering
+  // keburu timeout padahal prosesnya masih jalan — dinaikkan jadi 45 detik
+  // khusus untuk operasi tulis.
+  const timeoutMs  = ['upsert','delete','write'].includes(body.fn) ? 45000 : 15000;
+  const timeout    = setTimeout(() => controller.abort(), timeoutMs);
   try {
     // Auto-sisipkan token sesi untuk endpoint yang butuh requireAuth() di backend
     // (upsert/delete/write) — tanpa ini backend selalu menolak & sync macet "pending".
@@ -6329,7 +6335,7 @@ async function pushRepairHistory(wo, techNote, actualHours) {
     priority:    wo.priority,
   };
   try {
-    const body = JSON.stringify({ fn: 'upsert', sheet: 'EQ_REPAIR_HISTORY', row });
+    const body = JSON.stringify({ fn: 'upsert', sheet: 'EQ_REPAIR_HISTORY', row, token: SESSION?.token || '' });
     const url  = CFG.equipDbApi + '?fn=upsert&_body=' + encodeURIComponent(body);
     await fetch(url, { mode: 'cors' });
     toast(`History perbaikan ${wo.equipId} disimpan ✓`, 'success');
