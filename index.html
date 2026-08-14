@@ -2305,7 +2305,7 @@ document.addEventListener('touchmove', function(e) {
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
 const CFG = {
-  apiUrl:          'https://script.google.com/macros/s/AKfycbwlVll7bjKc9rXWHWSTO7sI0M0zlfhS7AdSZ4EB9PxzalPf6MKd1ochj_s73GyTYYB7mg/exec',
+  apiUrl:          'https://script.google.com/macros/s/AKfycbw6AOeGhZ-KMVudXzUfjM6p8DdPPPU0FPMjRIy7GdIKoAe9YIIokpE6inXlfEqWBgGsWg/exec',
   equipDbApi:      'https://script.google.com/macros/s/AKfycbyw_FZzkyoptG-JAsdltk0ZWVvVWZjTaWu0nGqn2SUxxVlGFCXbPA9_83C4070m5jOs/exec',
   // URL backend MaintWare (Warehouse) — WAJIB sama dengan konstanta API_URL
   // di file HTML MaintWare, supaya Parts Picker baca stok live & benar-benar
@@ -5148,13 +5148,24 @@ async function flushQueue() {
         delete SYNC.failCounts[key];
       } catch (e) {
         anyFailed = true;
+        const msg = e?.message || '';
+
+        // Error auth (token kosong/expired) TIDAK AKAN PERNAH sembuh dengan
+        // diulang-ulang — user wajib login ulang dulu. Hentikan retry item
+        // ini, tampilkan sekali, dan paksa ke layar login supaya dapat token baru.
+        if (/token/i.test(msg)) {
+          toast('⚠ Sesi login sudah tidak valid, sehingga perubahan tidak bisa disimpan ke server. Silakan login ulang.', 'error');
+          setTimeout(() => { if (confirm('Sesi login expired. Login ulang sekarang?')) doLogout(); }, 300);
+          continue; // jangan masukkan lagi ke queue — biar tidak diulang percuma
+        }
+
         const failCount = (SYNC.failCounts[key] || 0) + 1;
         SYNC.failCounts[key] = failCount;
         if (failCount >= 5) {
           // Item ini gagal berkali-kali (kemungkinan payload bermasalah).
           // Hentikan auto-retry item ini saja supaya tidak menyandera
           // item lain di queue selamanya, dan beri tahu user secara jelas.
-          toast(`⚠ Gagal sync setelah ${failCount}x percobaan (${key}). Buka WO tersebut, edit sedikit, lalu simpan lagi.`, 'error');
+          toast(`⚠ Gagal sync setelah ${failCount}x percobaan (${key}): ${msg || 'error tidak diketahui'}. Buka WO tersebut, edit sedikit, lalu simpan lagi.`, 'error');
         } else if (!(key in SYNC.queue)) {
           SYNC.queue[key] = item;
         }
@@ -6717,6 +6728,19 @@ function checkSession() {
   try {
     SESSION = JSON.parse(stored);
     const prevToken = SESSION?.token || ''; // simpan token lama sebelum SESSION di-rebuild
+
+    // PENTING: sesi tanpa token tidak akan pernah bisa upsert/delete/write —
+    // backend selalu menolaknya via requireAuth(). Ini terjadi pada sesi lama
+    // (sebelum fitur token auth ada) atau saat login terakhir gagal ambil
+    // token (mis. API sedang offline). Daripada dibiarkan retry sync selamanya
+    // tanpa pernah berhasil, paksa logout supaya user login ulang dan dapat
+    // token yang valid.
+    if (!prevToken) {
+      localStorage.removeItem(AUTH_KEY);
+      SESSION = null;
+      return false;
+    }
+
     // Bersihkan sisa pilihan unit lama — fitur unit selector dinonaktifkan
     if (SESSION && SESSION.selectedUnit) {
       delete SESSION.selectedUnit;
