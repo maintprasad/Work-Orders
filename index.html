@@ -2327,7 +2327,12 @@ const CFG = {
 let LOGIN_PREFETCH_PROMISE = null;
 
 function fetchUsersFromServer(timeoutMs) {
-  return fetch(CFG.apiUrl + '?fn=login', {
+  // fn=get_users: endpoint RINGAN yang HANYA membaca sheet WO_USERS
+  // (tidak scan seluruh WO/equipment/parts seperti fn=read), jadi
+  // proses buka halaman login jauh lebih cepat. fn=login sekarang
+  // WAJIB username+password (dipakai untuk login sungguhan, bukan
+  // prefetch), jadi tidak boleh dipakai di sini lagi.
+  return fetch(CFG.apiUrl + '?fn=get_users', {
     mode: 'cors',
     signal: AbortSignal.timeout(timeoutMs),
   }).then(r => r.json());
