@@ -5132,6 +5132,27 @@ async function refreshSessionToken() {
   return false;
 }
 
+// Backend bisa mengubah ID WO (tambah suffix -01, -02, dst) kalau nomor
+// yang dikirim ternyata sudah dipakai WO lain — biasanya karena race antar
+// user/device yang submit WO hampir bersamaan (generateWOId() di HTML cuma
+// nebak dari data lokal, jadi bisa bentrok). Kalau itu terjadi, ID lokal
+// HARUS disamakan dengan yang tersimpan di Sheets, supaya WO tetap tampil
+// dengan benar di HTML — bukan nyangkut di ID lama yang sudah tidak valid.
+function reconcileWOIdIfRenamed(sentId, finalId) {
+  if (!finalId || finalId === sentId) return;
+  const wo = WO.workorders.find(w => w.id === sentId);
+  if (!wo) return;
+  const oldId = wo.id;
+  wo.id = finalId;
+  addAudit(wo, 'note', `⚠ Nomor WO otomatis diubah karena bentrok: ${oldId} → ${finalId}`);
+  saveLocal();
+  toast(`⚠ WO ${oldId} diubah otomatis jadi ${finalId} (nomor bentrok dengan WO lain)`, 'warn');
+  if (CURRENT_DETAIL_WO_ID === oldId) CURRENT_DETAIL_WO_ID = finalId;
+  refreshAll();
+  if (ST.page === 'wo-list') renderWOList();
+  if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === finalId) showDetail(finalId);
+}
+
 // Tandai WO perlu di-sync (dipanggil setelah setiap perubahan)
 function queueSyncWO(wo) {
   SYNC.queue['wo:' + wo.id] = { type: 'upsert_wo', data: woToRow(wo) };
@@ -5170,8 +5191,9 @@ async function flushQueue() {
     for (const key of Object.keys(batch)) {
       const item = batch[key];
       try {
-        if (item.type === 'upsert_wo') {
-          await _fetchSilent(CFG.apiUrl, { fn: 'upsert', sheet: 'WO_ORDERS', row: item.data });
+                if (item.type === 'upsert_wo') {
+          const result = await _fetchSilent(CFG.apiUrl, { fn: 'upsert', sheet: 'WO_ORDERS', row: item.data });
+          reconcileWOIdIfRenamed(item.data.id, result && result.id);
         } else if (item.type === 'delete_wo') {
           await _fetchSilent(CFG.apiUrl, { fn: 'delete', sheet: 'WO_ORDERS', id: item.id });
         } else if (item.type === 'upsert_tech') {
