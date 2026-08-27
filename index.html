@@ -4249,12 +4249,11 @@ function openVerifyPhotoPicker(woId) {
     toast('✅ WO telah diverifikasi dan ditutup', 'success');
     sendWANotif('done', wo);
     // Upload foto verification DULU sampai selesai, baru sync WO — supaya data foto lengkap saat dikirim ke Sheets
-    await uploadPhotoSet('Verification', woId, files);
+        await uploadPhotoSet('Verification', woId, files);
     // Force flush langsung (bypass debounce) supaya tidak ada race dengan panggilan sync lain
     if (SYNC.timer) { clearTimeout(SYNC.timer); SYNC.timer = null; }
     syncUpsertWO(wo);
     await flushQueue();
-    syncToSecondarySheets(wo);
     if (ST.page === 'detail' && CURRENT_DETAIL_WO_ID === woId) showDetail(woId);
   };
   input.click();
@@ -5506,47 +5505,14 @@ function photosCellStrToArr(str) {
 }
 
 // Backward-compat stubs (lama dipanggil langsung, sekarang pakai queue)
-function syncUpsertWO(wo)   { queueSyncWO(wo); queueSecondarySync(wo); }
+// Mirror ke WO_MIRROR DIHAPUS — sebelumnya setiap simpan WO melakukan
+// 2x network call (WO_ORDERS + WO_MIRROR), menggandakan waktu submit
+// dan closing WO. Kalau nanti butuh salinan data untuk monitoring,
+// lakukan di sisi GAS (trigger onEdit/time-driven), bukan dobel call
+// dari HTML.
+function syncUpsertWO(wo)   { queueSyncWO(wo); }
 function syncDeleteWO(id)   { queueDeleteWO(id); }
 function syncUpsertTech(t)  { queueSyncTech(t); }
-
-// ── SECONDARY SHEETS SYNC ──
-// Mirror data WO ke Google Sheets kedua (read-only dari sisi HTML).
-// Data dari sheets kedua tidak akan dibaca/mempengaruhi tampilan HTML.
-const SYNC2 = { queue: {}, timer: null, debounceMs: 3000 };
-
-function queueSecondarySync(wo) {
-  if (!CFG.secondaryApiUrl) return;
-  SYNC2.queue[wo.id] = wo;
-  if (SYNC2.timer) clearTimeout(SYNC2.timer);
-  SYNC2.timer = setTimeout(() => {
-    const items = Object.values(SYNC2.queue);
-    SYNC2.queue = {};
-    items.forEach(w => syncToSecondarySheets(w));
-  }, SYNC2.debounceMs);
-}
-
-async function syncToSecondarySheets(wo) {
-  if (!CFG.secondaryApiUrl) return; // URL belum diset, skip
-  try {
-    const row = {
-      ...woToRow(wo),
-      syncedAt:    new Date().toISOString(),
-      syncedBy:    SESSION?.nama || '—',
-      syncSource:  'WO_SYSTEM_HTML',
-    };
-    await fetch(CFG.secondaryApiUrl, {
-      method:  'POST',
-      mode:    'cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body:    JSON.stringify({ fn: 'upsert', sheet: 'WO_MIRROR', row }),
-      signal:  AbortSignal.timeout(15000),
-    });
-    // Tidak perlu handle response — ini one-way mirror, silent fail OK
-  } catch(e) {
-    console.warn('[SecondarySheets] Sync gagal (silent):', e.message);
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // HELPERS / BADGES
@@ -6683,93 +6649,74 @@ async function doLogin() {
   errEl.textContent = '';
   loginBtn.disabled = true;
 
-  // Feedback berjalan (bukan diam) supaya terasa responsif meski GAS lambat
   let elapsed = 0;
   loginBtn.textContent = 'Menghubungkan...';
   const tickTimer = setInterval(() => {
     elapsed++;
-    loginBtn.textContent = elapsed < 8
-      ? 'Menghubungkan...'
-      : `Menghubungkan... (${elapsed}s)`;
+    loginBtn.textContent = elapsed < 8 ? 'Menghubungkan...' : `Menghubungkan... (${elapsed}s)`;
   }, 1000);
 
-  // Pakai promise prefetch yang SUDAH berjalan sejak halaman dimuat —
-  // tidak membuat request baru dari nol, sehingga jauh lebih cepat.
-  let result;
+  // SATU kali round trip: fn=login sekaligus memvalidasi username+password
+  // DAN mengembalikan token sesi. Tidak lagi menunggu prefetch daftar
+  // user (fn=get_users) lebih dulu — itu penyebab login lama/kadang gagal
+  // karena dulu perlu 2-3x bolak-balik ke GAS sebelum sesi terbentuk.
+  let tokData = null;
   try {
-    result = await LOGIN_PREFETCH_PROMISE;
-  } catch {
-    result = { users: loadUsers(), online: false };
+    const tokResp = await fetch(
+      CFG.apiUrl + '?fn=login&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+      { mode: 'cors', signal: AbortSignal.timeout(25000) }
+    );
+    tokData = await tokResp.json();
+  } catch (e) {
+    console.warn('[doLogin] fn=login gagal, coba fallback offline:', e.message);
   }
 
   clearInterval(tickTimer);
   loginBtn.textContent = 'MASUK →';
   loginBtn.disabled = false;
 
-  const { users, online } = result;
+  // ── Berhasil login online ──
+  if (tokData && tokData.success && tokData.token && tokData.user) {
+    const u = tokData.user;
+    SESSION = { userId:u.id, username:u.username, nama:u.nama, role:u.role, jabatan:u.jabatan||'', token: tokData.token };
+    localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
+    // Simpan salinan ringan (tanpa password) untuk fallback offline nanti
+    const cached = loadUsers().filter(x => x.id !== u.id);
+    cached.push({ ...u, status: 'Active' });
+    saveUsers(cached);
 
-  // Kalau percobaan barusan gagal terhubung, siapkan ulang prefetch
-  // di background supaya klik "MASUK" berikutnya punya kesempatan baru
-  // tanpa harus reload halaman.
-  if (!online) {
-    LOGIN_PREFETCH_PROMISE = startLoginPrefetch();
-  }
-
-  if (!users.length) {
-    if (!online) {
-      errEl.textContent = '⚠ Tidak dapat terhubung ke server dan belum ada data tersimpan. Periksa koneksi internet, lalu tekan MASUK sekali lagi.';
-    } else {
-      errEl.textContent = '⚠ Belum ada user terdaftar. Hubungi Administrator.';
-    }
+    document.getElementById('login-screen').style.display = 'none';
+    if (needsUnitSelector(SESSION.role)) { showUnitSelector(); }
+    else { applyRoleUI(); init(); }
     return;
   }
 
-  if (!online) {
-    errEl.style.color = 'var(--accent)';
-    errEl.textContent = '⚠ Mode offline — menggunakan data tersimpan';
-    setTimeout(() => { errEl.textContent = ''; errEl.style.color = ''; }, 3000);
+  // ── Online tapi ditolak backend (salah username/password) ──
+  if (tokData && tokData.message) {
+    errEl.textContent = '⚠ ' + tokData.message;
+    document.getElementById('li-pass').value = '';
+    return;
   }
 
+  // ── Server tidak terjangkau sama sekali → fallback offline dari cache ──
+  const users = loadUsers();
+  if (!users.length) {
+    errEl.textContent = '⚠ Tidak dapat terhubung ke server dan belum ada data tersimpan. Periksa koneksi internet, lalu coba lagi.';
+    return;
+  }
+  errEl.style.color = 'var(--accent)';
+  errEl.textContent = '⚠ Mode offline — menggunakan data tersimpan';
   const user = users.find(u => u.username && u.username.toLowerCase() === username && u.status === 'Active');
   if (!user) {
     errEl.style.color = '';
-    errEl.textContent = '⚠ Username tidak ditemukan atau tidak aktif';
-    document.getElementById('li-pass').value = '';
+    errEl.textContent = '⚠ Username tidak ditemukan (offline)';
     return;
   }
-  if (!verifyPassword(password, user.password)) {
-    errEl.style.color = '';
-    errEl.textContent = '⚠ Password salah';
-    document.getElementById('li-pass').value = '';
-    return;
-  }
-
-  // Ambil token sesi asli dari backend — dipakai backend untuk requireAuth()
-  // di endpoint upsert/delete/write. Tanpa ini SEMUA simpan/update WO akan
-  // selalu ditolak backend dan status sync macet di "pending" terus.
-  let sessionToken = '';
-  try {
-    const tokResp = await fetch(
-      CFG.apiUrl + '?fn=login&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
-      { mode: 'cors', signal: AbortSignal.timeout(15000) }
-    );
-    const tokData = await tokResp.json();
-    if (tokData.success && tokData.token) sessionToken = tokData.token;
-  } catch (e) {
-    console.warn('[doLogin] Gagal ambil token sesi (mode offline?):', e.message);
-  }
-
-  SESSION = { userId:user.id, username:user.username, nama:user.nama, role:user.role, jabatan:user.jabatan||'', token: sessionToken };
+  SESSION = { userId:user.id, username:user.username, nama:user.nama, role:user.role, jabatan:user.jabatan||'', token:'' };
   localStorage.setItem(AUTH_KEY, JSON.stringify(SESSION));
-
   document.getElementById('login-screen').style.display = 'none';
-
-  if (needsUnitSelector(SESSION.role)) {
-    showUnitSelector();
-  } else {
-    applyRoleUI();
-    init();
-  }
+  if (needsUnitSelector(SESSION.role)) { showUnitSelector(); }
+  else { applyRoleUI(); init(); }
 }
 
 function doLogout() {
