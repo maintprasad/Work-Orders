@@ -1489,6 +1489,8 @@ _Terima kasih. WO telah ditutup._</div>
   <option value="all">Semua Unit</option>
   <option value="U-001">Unit 1</option>
   <option value="U-002">Unit 2</option>
+  <option value="U-003">Unit Malang</option>
+  <option value="U-004">Unit Lombok</option>
 </select>
 <select class="fsel" id="cmp-year" onchange="renderComparison()" style="min-width:90px">
       </select>
@@ -1869,14 +1871,14 @@ _Terima kasih. WO telah ditutup._</div>
             <option>Customer</option>
             <option>HSE</option>
             <option>Management</option>
-            <option>Other</option>
+            <option>Warehouse</option>
           </select>
         </div>
 
         <!-- Equipment -->
         <div class="fg full">
           <label class="flabel">Equipment</label>
-          <select class="fsel2" id="wo-equip">
+          <select class="fsel2" id="wo-equip" onchange="updateWOIdPreview()">
             <option value="">— Pilih Equipment —</option>
           </select>
         </div>
@@ -4020,7 +4022,7 @@ function saveWO() {
     addAudit(wo, 'note', `WO diedit — Requestor: ${requestorName}${requestorDept ? ' ('+requestorDept+')' : ''}`);
     toast('WO diupdate', 'success');
   } else {
-    const newId = generateWOId(unitId, areaId);
+        const newId = generateWOId(unitId, areaId, equipId);
     wo = {
       id: newId, title,
       type:            document.getElementById('wo-type').value,
@@ -4109,12 +4111,37 @@ function quickStatusChange(woId, newStatus) {
   toast(`WO ${woId}: ${old} → ${newStatus}`, 'success');
 }
 
-function generateWOId(unitId, areaId) {
+function generateWOId(unitId, areaId, equipId) {
   const unit  = (EQUIP_DB.units||[]).find(u => u.id === unitId);
   const area  = (EQUIP_DB.areas||[]).find(a => a.id === areaId);
-  const year  = new Date().getFullYear();
-  const unitSlug = unit ? unit.id.replace(/[^A-Za-z0-9]/g,'') : unitId.replace(/[^A-Za-z0-9]/g,'');
-  const areaSlug = area ? area.name.replace(/\s+/g,'-').replace(/[^A-Za-z0-9\-]/g,'') : areaId;
+  const equip = (EQUIP_DB.equipment||[]).find(e => e.id === equipId);
+  const now   = new Date();
+  const year  = now.getFullYear();
+  const unitNameLC = (unit?.name || unitId || '').toLowerCase();
+  const areaSlug = area ? area.name.replace(/\s+/g,'-').replace(/[^A-Za-z0-9\-]/g,'') : (areaId || 'NA');
+
+  // ── Format khusus Unit Malang & Unit Lombok ──
+  // UM/Area/Equipment/YYYY/MM/DD/seq (seq direset tiap bulan)
+  // UL/Area/Equipment/YYYY/MM/DD/seq (seq direset tiap bulan)
+  const isMalang = unitNameLC.includes('malang');
+  const isLombok = unitNameLC.includes('lombok');
+  if (isMalang || isLombok) {
+    const prefix    = isMalang ? 'UM' : 'UL';
+    const month     = String(now.getMonth() + 1).padStart(2, '0');
+    const day       = String(now.getDate()).padStart(2, '0');
+    const equipSlug = equip ? equip.name.replace(/\s+/g,'-').replace(/[^A-Za-z0-9\-]/g,'') : (equipId || 'NA');
+    const existing = WO.workorders.filter(w => {
+      if (!w.id) return false;
+      const parts = w.id.split('/');
+      return parts.length === 7 && parts[0] === prefix &&
+        parts[3] === String(year) && parts[4] === month;
+    });
+    const seq = String(existing.length + 1).padStart(3, '0');
+    return `${prefix}/${areaSlug}/${equipSlug}/${year}/${month}/${day}/${seq}`;
+  }
+
+  // ── Format default untuk unit lainnya (tidak berubah) ──
+  const unitSlug = unit ? unit.id.replace(/[^A-Za-z0-9]/g,'') : (unitId || '').replace(/[^A-Za-z0-9]/g,'');
   const existing = WO.workorders.filter(w => {
     if (!w.id) return false;
     const parts = w.id.split('/');
@@ -4155,6 +4182,7 @@ function updateWOIdPreview() {
   if (editId) return;
   const unitId    = document.getElementById('wo-unit').value;
   const areaId    = document.getElementById('wo-area').value;
+  const equipId   = document.getElementById('wo-equip')?.value || '';
   const previewEl = document.getElementById('wo-tag-preview');
   if (!previewEl) return;
   if (!unitId || !areaId) {
@@ -4162,7 +4190,7 @@ function updateWOIdPreview() {
     previewEl.style.color = 'var(--text3)';
     return;
   }
-  const preview = generateWOId(unitId, areaId);
+  const preview = generateWOId(unitId, areaId, equipId);
   previewEl.textContent = preview;
   previewEl.style.color = 'var(--accent)';
   document.getElementById('wo-tag').value = preview;
@@ -8110,11 +8138,13 @@ function saveUser() {
     users[idx].whatsapp = whatsapp;
     users[idx].status   = status;
     if (password) users[idx].password = password; // simpan plain text ke Sheets
-    saveUsers(users);
+        saveUsers(users);
     closeModal('user');
     renderUserManagement();
     toast('User diupdate', 'success');
-    syncUserToSheets(users[idx]);
+    syncUserToSheets(users[idx]).then(res => {
+      if (!res.ok) toast('⚠ Update user tersimpan lokal, gagal sync ke Sheets: ' + res.message, 'error');
+    });
   } else {
     const newUser = {
       id: 'U-' + Date.now(),
@@ -8125,13 +8155,13 @@ function saveUser() {
     saveUsers(users);
     closeModal('user');
     renderUserManagement();
-    toast('User ' + nama + ' ditambahkan — menyinkronkan ke server...', 'success');
-    // Sync dengan feedback lebih jelas
-    syncUserToSheets(newUser).then(ok => {
-      if (ok) {
+        toast('User ' + nama + ' ditambahkan — menyinkronkan ke server...', 'success');
+    // Sync dengan feedback lebih jelas + pesan error asli untuk diagnosis
+    syncUserToSheets(newUser).then(res => {
+      if (res.ok) {
         toast('✓ User ' + nama + ' berhasil disinkron ke Sheets', 'success');
       } else {
-        toast('⚠ User tersimpan lokal. Sync ke Sheets gagal — akan dicoba ulang saat online.', 'warn');
+        toast('⚠ User tersimpan lokal, gagal sync ke Sheets: ' + res.message, 'error');
       }
     });
   }
@@ -8153,23 +8183,30 @@ function deleteUser(userId) {
 
 // Sync user ke GAS Sheets — password disimpan di Sheets sebagai sumber utama
 // Return true jika berhasil, false jika gagal
-async function syncUserToSheets(user) {
+async function syncUserToSheets(user, _isRetry) {
+  const row = {
+    id:       user.id,
+    username: user.username,
+    nama:     user.nama,
+    role:     user.role,
+    jabatan:  user.jabatan  || '',
+    whatsapp: user.whatsapp || '',
+    status:   user.status,
+    password: user.password || '', // plain text, disimpan di Sheets
+  };
   try {
-    const row = {
-      id:       user.id,
-      username: user.username,
-      nama:     user.nama,
-      role:     user.role,
-      jabatan:  user.jabatan  || '',
-      whatsapp: user.whatsapp || '',
-      status:   user.status,
-      password: user.password || '', // plain text, disimpan di Sheets
-    };
     await _fetchSilent(CFG.apiUrl, { fn:'upsert', sheet:'WO_USERS', row });
-    return true;
+    return { ok: true };
   } catch(e) {
-    console.warn('Sync user gagal (offline?):', e.message);
-    return false;
+    const msg = e?.message || 'Error tidak diketahui';
+    console.warn('[syncUserToSheets] Gagal:', msg);
+
+    // Token sesi expired/kosong — coba refresh diam-diam lalu ulangi sekali
+    if (/token/i.test(msg) && !_isRetry) {
+      const refreshed = await refreshSessionToken();
+      if (refreshed) return syncUserToSheets(user, true);
+    }
+    return { ok: false, message: msg };
   }
 }
 
