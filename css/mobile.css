@@ -1,0 +1,92 @@
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE LAYER — supaya tampilan "pas" di layar HP.
+   File ini HANYA nambah/menegaskan aturan buat layar kecil, tidak
+   mengubah tampilan desktop sama sekali (semua rule di sini ada di
+   dalam @media(max-width:768px) atau di-scope ke class .is-mobile
+   yang di-set oleh js/01b-mobile.js).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Jaga-jaga: jangan sampai ada elemen manapun yang bikin body bisa
+   di-scroll ke samping (nyembunyiin tombol/elemen lain di luar layar) */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+@media (max-width: 768px) {
+
+  /* ── Pagination Previous/Next — pastikan SELALU kelihatan, jangan
+     sampai ketiban mobile-nav di bawah, dan tombolnya cukup besar
+     untuk jari ── */
+  .wo-pager {
+    position: relative;
+    z-index: 1;
+    padding: 14px 4px calc(14px + env(safe-area-inset-bottom));
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+  .wo-pager-btn {
+    font-size: 13px;
+    padding: 10px 16px;
+    min-height: 40px;
+  }
+  .wo-pager-info {
+    width: 100%;
+    order: 3; /* teks halaman pindah ke bawah kalau space sempit, tombol tetap sejajar di atas */
+    font-size: 11px;
+  }
+
+  /* ── Header section (judul + tombol Card View/Cetak/Buat WO) —
+     jangan sampai tombolnya kepotong, biarkan wrap ke baris baru ── */
+  .sec-hdr {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .sec-hdr > div:last-child {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .sec-hdr > div:last-child .btn-ghost,
+  .sec-hdr > div:last-child .btn-primary {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+
+  /* ── Kartu WO — pastikan tidak overflow ke samping ── */
+  .wo-card {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── Search box full width, tidak kepotong ── */
+  .search-wrap {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  /* ── Tombol umum di modal/detail — jangan sampai teks kepotong ── */
+  .btn-primary, .btn-ghost, .btn-sm {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── Tabel: kalau user tetap pilih Table View manual di HP, minimal
+     kolomnya tidak kepencet — beri lebar minimum supaya scroll
+     horizontal di dalam .tbl-wrap (BUKAN scroll seluruh halaman) ── */
+  .data-table {
+    min-width: 720px;
+  }
+}
+
+/* ── Kelas is-mobile: di-set lewat JS (window resize/orientation),
+   dipakai untuk penyesuaian yang tidak bisa murni CSS media query
+   (misal default Card View pertama kali dibuka, lihat js/01b-mobile.js) ── */
+.is-mobile .wo-board {
+  gap: 10px;
+}
